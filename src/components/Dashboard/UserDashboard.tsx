@@ -49,28 +49,35 @@ export function UserDashboard({ onCreateCase, onViewCase }: UserDashboardProps) 
   };
 
   return (
-    <div className="min-h-screen bg-gradient-subtle">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white border-b shadow-card">
+      <header className="glass border-b border-white/10 sticky top-0 z-50 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center">
-                <FileText className="w-5 h-5 text-white" />
+              <div className="w-12 h-12 bg-gradient-hero rounded-xl flex items-center justify-center shadow-lg shadow-primary/25">
+                <FileText className="w-6 h-6 text-white" />
               </div>
-              <h1 className="text-2xl font-bold text-foreground">ResolveIt</h1>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+                  ResolveIt
+                </h1>
+                <p className="text-xs text-muted-foreground">Dispute Resolution Platform</p>
+              </div>
             </div>
             
             <div className="flex items-center space-x-4">
-              <Avatar>
+              <Avatar className="ring-2 ring-primary/20">
                 <AvatarImage src={user?.avatar} alt={user?.name} />
-                <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
+                <AvatarFallback className="bg-gradient-primary text-white">
+                  {user?.name?.charAt(0)}
+                </AvatarFallback>
               </Avatar>
-              <div className="text-right">
-                <p className="text-sm font-medium">{user?.name}</p>
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-semibold text-foreground">{user?.name}</p>
                 <p className="text-xs text-muted-foreground">{user?.email}</p>
               </div>
-              <Button variant="outline" onClick={logout}>
+              <Button variant="glass" onClick={logout}>
                 Logout
               </Button>
             </div>
@@ -80,137 +87,194 @@ export function UserDashboard({ onCreateCase, onViewCase }: UserDashboardProps) 
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-foreground mb-2">
-            Welcome back, {user?.name?.split(' ')[0]}
-          </h2>
-          <p className="text-muted-foreground">
-            Manage your cases and track dispute resolution progress
-          </p>
+        <div className="mb-12 animate-fade-in">
+          <div className="text-center mb-8">
+            <h2 className="text-4xl font-bold bg-gradient-to-r from-foreground via-primary to-primary-glow bg-clip-text text-transparent mb-4">
+              Welcome back, {user?.name?.split(' ')[0]} ✨
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Your comprehensive dashboard for managing disputes and tracking resolution progress
+            </p>
+          </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 animate-slide-up">
+          <Card className="glass hover-lift border-primary/20 bg-gradient-card">
             <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <FileText className="w-6 h-6 text-primary" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-3xl font-bold text-foreground mb-1">{stats.total}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Total Cases</p>
                 </div>
-                <div className="ml-4">
-                  <p className="text-2xl font-bold">{stats.total}</p>
-                  <p className="text-sm text-muted-foreground">Total Cases</p>
+                <div className="p-3 bg-gradient-primary rounded-xl shadow-lg shadow-primary/25">
+                  <FileText className="w-6 h-6 text-white" />
                 </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <p className="text-xs text-muted-foreground">📊 All time</p>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="glass hover-lift border-warning/20 bg-gradient-card">
             <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="p-2 bg-warning/10 rounded-lg">
-                  <Clock className="w-6 h-6 text-warning" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-3xl font-bold text-foreground mb-1">{stats.pending}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Pending Review</p>
                 </div>
-                <div className="ml-4">
-                  <p className="text-2xl font-bold">{stats.pending}</p>
-                  <p className="text-sm text-muted-foreground">Pending</p>
+                <div className="p-3 bg-gradient-to-br from-warning to-orange-400 rounded-xl shadow-lg shadow-warning/25">
+                  <Clock className="w-6 h-6 text-white" />
                 </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <p className="text-xs text-muted-foreground">⏳ Awaiting verification</p>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="glass hover-lift border-blue-400/20 bg-gradient-card">
             <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <AlertCircle className="w-6 h-6 text-primary" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-3xl font-bold text-foreground mb-1">{stats.inProgress}</p>
+                  <p className="text-sm text-muted-foreground font-medium">In Progress</p>
                 </div>
-                <div className="ml-4">
-                  <p className="text-2xl font-bold">{stats.inProgress}</p>
-                  <p className="text-sm text-muted-foreground">In Progress</p>
+                <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg shadow-blue-500/25">
+                  <AlertCircle className="w-6 h-6 text-white" />
                 </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <p className="text-xs text-muted-foreground">🔄 Active cases</p>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="glass hover-lift border-success/20 bg-gradient-card">
             <CardContent className="p-6">
-              <div className="flex items-center">
-                <div className="p-2 bg-success/10 rounded-lg">
-                  <CheckCircle className="w-6 h-6 text-success" />
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-3xl font-bold text-foreground mb-1">{stats.resolved}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Resolved</p>
                 </div>
-                <div className="ml-4">
-                  <p className="text-2xl font-bold">{stats.resolved}</p>
-                  <p className="text-sm text-muted-foreground">Resolved</p>
+                <div className="p-3 bg-gradient-to-br from-success to-emerald-500 rounded-xl shadow-lg shadow-success/25">
+                  <CheckCircle className="w-6 h-6 text-white" />
                 </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <p className="text-xs text-muted-foreground">✅ Completed</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row gap-6 mb-12 animate-scale-in">
           <Button 
-            variant="professional" 
+            variant="premium" 
+            size="lg"
             onClick={onCreateCase}
+            className="sm:w-auto w-full group"
+          >
+            <Plus className="w-5 h-5 mr-2 group-hover:rotate-90 transition-transform duration-200" />
+            Create New Case
+          </Button>
+          <Button 
+            variant="glass" 
+            size="lg"
             className="sm:w-auto w-full"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Create New Case
+            <FileText className="w-5 h-5 mr-2" />
+            Case Templates
+          </Button>
+          <Button 
+            variant="outline" 
+            size="lg"
+            className="sm:w-auto w-full"
+          >
+            <AlertCircle className="w-5 h-5 mr-2" />
+            Help & Support
           </Button>
         </div>
 
         {/* Cases List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Cases</CardTitle>
-            <CardDescription>
-              Track the progress of your dispute resolution cases
-            </CardDescription>
+        <Card className="glass border-primary/20 bg-gradient-card animate-fade-in">
+          <CardHeader className="pb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-2xl bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
+                  Your Cases
+                </CardTitle>
+                <CardDescription className="text-muted-foreground mt-2">
+                  Track the progress of your dispute resolution cases
+                </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="glass" size="sm">Filter</Button>
+                <Button variant="glass" size="sm">Sort</Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {cases.length === 0 ? (
-              <div className="text-center py-12">
-                <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No cases yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Get started by creating your first case
+              <div className="text-center py-16">
+                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-primary rounded-full flex items-center justify-center shadow-lg shadow-primary/25">
+                  <FileText className="w-10 h-10 text-white" />
+                </div>
+                <h3 className="text-2xl font-bold mb-3 text-foreground">No cases yet</h3>
+                <p className="text-muted-foreground mb-8 max-w-md mx-auto">
+                  Ready to resolve a dispute? Create your first case to get started with our resolution process.
                 </p>
-                <Button variant="professional" onClick={onCreateCase}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Case
+                <Button variant="premium" size="lg" onClick={onCreateCase}>
+                  <Plus className="w-5 h-5 mr-2" />
+                  Create Your First Case
                 </Button>
               </div>
             ) : (
-              <div className="space-y-4">
-                {cases.map((case_) => (
+              <div className="space-y-6">
+                {cases.map((case_, index) => (
                   <div 
                     key={case_.id}
-                    className="border rounded-lg p-4 hover:shadow-card transition-shadow"
+                    className="glass border border-white/10 rounded-xl p-6 hover-lift group"
+                    style={{ animationDelay: `${index * 0.1}s` }}
                   >
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center space-x-3">
-                        <Badge variant="outline">{case_.caseType}</Badge>
+                        <Badge variant="outline" className="bg-primary/10 border-primary/30 text-primary font-semibold">
+                          {case_.caseType}
+                        </Badge>
                         {getStatusBadge(case_.status)}
                       </div>
                       <Button 
-                        variant="outline" 
+                        variant="glass" 
                         size="sm"
                         onClick={() => onViewCase(case_.id)}
+                        className="group-hover:border-primary/40 transition-all duration-200"
                       >
                         <Eye className="w-4 h-4 mr-2" />
-                        View
+                        View Details
                       </Button>
                     </div>
                     
-                    <h4 className="font-semibold text-lg mb-2">{case_.title}</h4>
-                    <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
+                    <h4 className="font-bold text-xl mb-3 text-foreground group-hover:text-primary transition-colors">
+                      {case_.title}
+                    </h4>
+                    <p className="text-muted-foreground text-sm mb-4 line-clamp-2 leading-relaxed">
                       {case_.description}
                     </p>
                     
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <span>vs. {case_.oppositePartyName}</span>
-                      <span>Created {new Date(case_.createdAt).toLocaleDateString()}</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <span className="font-medium">vs. {case_.oppositePartyName}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground bg-muted/20 px-3 py-1 rounded-full">
+                        📅 {new Date(case_.createdAt).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric', 
+                          year: 'numeric' 
+                        })}
+                      </div>
                     </div>
                   </div>
                 ))}
