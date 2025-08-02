@@ -7,7 +7,7 @@ A comprehensive Node.js/Express backend for the ResolveIt dispute resolution pla
 - **Authentication & Authorization**: JWT-based authentication with role-based access control
 - **User Management**: Registration, login, profile management, password reset
 - **Case Management**: Complete CRUD operations for dispute cases
-- **File Upload**: Secure file upload with Cloudinary integration
+- **File Upload**: Secure file upload with local storage using Multer
 - **Real-time Updates**: Socket.IO for live notifications
 - **Admin Dashboard**: Comprehensive admin panel with analytics
 - **Security**: Helmet, CORS, rate limiting, input validation
@@ -17,7 +17,6 @@ A comprehensive Node.js/Express backend for the ResolveIt dispute resolution pla
 
 - Node.js (v16 or higher)
 - MongoDB (local or Atlas)
-- Cloudinary account (for file uploads)
 - SMTP email service (Gmail, SendGrid, etc.)
 
 ## 🛠️ Installation
@@ -45,15 +44,14 @@ A comprehensive Node.js/Express backend for the ResolveIt dispute resolution pla
    # JWT
    JWT_SECRET=your-super-secret-jwt-key
    
-   # Cloudinary
-   CLOUDINARY_CLOUD_NAME=your-cloud-name
-   CLOUDINARY_API_KEY=your-api-key
-   CLOUDINARY_API_SECRET=your-api-secret
-   
    # Email
    SMTP_HOST=smtp.gmail.com
    SMTP_USER=your-email@gmail.com
    SMTP_PASS=your-app-password
+   
+   # File Upload
+   MAX_FILE_SIZE=10485760
+   ALLOWED_FILE_TYPES=image/jpeg,image/png,image/gif,image/webp,video/mp4,video/avi,video/mov,audio/mpeg,audio/wav,audio/mp3,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document
    ```
 
 4. **Start the server**
@@ -230,6 +228,21 @@ Content-Type: application/json
 }
 ```
 
+## 📁 File Storage
+
+Files are stored locally in the `uploads/` directory with the following structure:
+```
+uploads/
+├── images/     # Image files (jpg, png, gif, webp)
+├── videos/     # Video files (mp4, avi, mov)
+├── audio/      # Audio files (mp3, wav, mpeg)
+└── documents/  # Document files (pdf, doc, docx)
+```
+
+Files are served statically at `/uploads/` path and can be accessed via URLs like:
+- `/uploads/images/document-1234567890.jpg`
+- `/uploads/documents/contract-1234567890.pdf`
+
 ## 🔄 Real-time Features
 
 The API includes Socket.IO for real-time updates:
@@ -257,14 +270,11 @@ npm run test:coverage
 | `MONGODB_URI` | MongoDB connection string | - |
 | `JWT_SECRET` | JWT signing secret | - |
 | `JWT_EXPIRES_IN` | JWT expiration time | 7d |
-| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name | - |
-| `CLOUDINARY_API_KEY` | Cloudinary API key | - |
-| `CLOUDINARY_API_SECRET` | Cloudinary API secret | - |
 | `SMTP_HOST` | SMTP server host | - |
 | `SMTP_PORT` | SMTP server port | 587 |
 | `SMTP_USER` | SMTP username | - |
 | `SMTP_PASS` | SMTP password | - |
-| `CORS_ORIGIN` | Allowed CORS origin | http://localhost:3000 |
+| `CORS_ORIGIN` | Allowed CORS origin | http://localhost:8080 |
 | `MAX_FILE_SIZE` | Maximum file size (bytes) | 10485760 |
 | `ALLOWED_FILE_TYPES` | Comma-separated MIME types | - |
 

@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { mockCases } from '@/data/mockData';
+import { casesApi, Case } from '@/services/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Plus, FileText, Clock, CheckCircle, XCircle, AlertCircle, Eye } from 'lucide-react';
-import { Case } from '@/types';
+import { Plus, FileText, Clock, CheckCircle, XCircle, AlertCircle, Eye, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface UserDashboardProps {
   onCreateCase: () => void;
@@ -27,7 +27,36 @@ const statusConfig = {
 
 export function UserDashboard({ onCreateCase, onViewCase }: UserDashboardProps) {
   const { user, logout } = useAuth();
-  const [cases] = useState<Case[]>(mockCases);
+  const { toast } = useToast();
+  const [cases, setCases] = useState<Case[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    loadUserCases();
+  }, []);
+
+  const loadUserCases = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+      const response = await casesApi.getUserCases();
+      if (response.success && response.data?.cases) {
+        setCases(response.data.cases);
+      } else {
+        setError('Failed to load cases');
+      }
+    } catch (error: any) {
+      setError(error.message || 'Failed to load cases');
+      toast({
+        title: "Error",
+        description: "Failed to load your cases. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getStatusBadge = (status: Case['status']) => {
     const config = statusConfig[status];
@@ -47,6 +76,56 @@ export function UserDashboard({ onCreateCase, onViewCase }: UserDashboardProps) 
     inProgress: cases.filter(c => ['Awaiting Response', 'Panel Created', 'Mediation in Progress'].includes(c.status)).length,
     resolved: cases.filter(c => c.status === 'Resolved').length,
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <header className="glass border-b border-white/10 sticky top-0 z-50 backdrop-blur-xl">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-gradient-hero rounded-xl flex items-center justify-center shadow-lg shadow-primary/25">
+                  <FileText className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+                    ResolveIt
+                  </h1>
+                  <p className="text-xs text-muted-foreground">Dispute Resolution Platform</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                <Avatar className="ring-2 ring-primary/20">
+                  <AvatarImage src={user?.photo} alt={user?.name} />
+                  <AvatarFallback className="bg-gradient-primary text-white">
+                    {user?.name?.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-semibold text-foreground">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                </div>
+                <Button variant="glass" onClick={logout}>
+                  Logout
+                </Button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+              <p className="text-muted-foreground">Loading your dashboard...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -68,7 +147,7 @@ export function UserDashboard({ onCreateCase, onViewCase }: UserDashboardProps) 
             
             <div className="flex items-center space-x-4">
               <Avatar className="ring-2 ring-primary/20">
-                <AvatarImage src={user?.avatar} alt={user?.name} />
+                <AvatarImage src={user?.photo} alt={user?.name} />
                 <AvatarFallback className="bg-gradient-primary text-white">
                   {user?.name?.charAt(0)}
                 </AvatarFallback>
@@ -211,13 +290,25 @@ export function UserDashboard({ onCreateCase, onViewCase }: UserDashboardProps) 
                 </CardDescription>
               </div>
               <div className="flex gap-2">
-                <Button variant="glass" size="sm">Filter</Button>
-                <Button variant="glass" size="sm">Sort</Button>
+                <Button variant="glass" size="sm" onClick={loadUserCases}>
+                  Refresh
+                </Button>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            {cases.length === 0 ? (
+            {error && (
+              <div className="text-center py-8">
+                <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">Error loading cases</h3>
+                <p className="text-muted-foreground mb-4">{error}</p>
+                <Button onClick={loadUserCases} variant="outline">
+                  Try Again
+                </Button>
+              </div>
+            )}
+
+            {!error && cases.length === 0 ? (
               <div className="text-center py-16">
                 <div className="w-20 h-20 mx-auto mb-6 bg-gradient-primary rounded-full flex items-center justify-center shadow-lg shadow-primary/25">
                   <FileText className="w-10 h-10 text-white" />
@@ -235,7 +326,7 @@ export function UserDashboard({ onCreateCase, onViewCase }: UserDashboardProps) 
               <div className="space-y-6">
                 {cases.map((case_, index) => (
                   <div 
-                    key={case_.id}
+                    key={case_._id}
                     className="glass border border-white/10 rounded-xl p-6 hover-lift group"
                     style={{ animationDelay: `${index * 0.1}s` }}
                   >
@@ -249,7 +340,7 @@ export function UserDashboard({ onCreateCase, onViewCase }: UserDashboardProps) 
                       <Button 
                         variant="glass" 
                         size="sm"
-                        onClick={() => onViewCase(case_.id)}
+                        onClick={() => onViewCase(case_._id)}
                         className="group-hover:border-primary/40 transition-all duration-200"
                       >
                         <Eye className="w-4 h-4 mr-2" />

@@ -1,38 +1,67 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import compression from 'compression';
-import morgan from 'morgan';
-import dotenv from 'dotenv';
-import { Server } from 'socket.io';
+import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
-
-// Import database connection
+import { Server } from 'socket.io';
+import path from 'path';
+import { serveUploads } from './utils/fileUpload.js';
 import connectDB from './config/database.js';
-
-// Import routes
 import authRoutes from './routes/auth.js';
 import caseRoutes from './routes/cases.js';
 import adminRoutes from './routes/admin.js';
+import User from './models/User.js';
+import bcrypt from 'bcryptjs';
 
-// Load environment variables
-dotenv.config();
-
-// Initialize Express app
 const app = express();
 const server = createServer(app);
-
-// Initialize Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-    methods: ['GET', 'POST']
+    origin: process.env.FRONTEND_URL || "http://localhost:8080",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
   }
 });
 
-// Connect to MongoDB
-connectDB();
+// Create default admin user on startup
+async function createDefaultAdmin() {
+  try {
+    const hashedPassword = await bcrypt.hash('admin123', 12);
+    
+    await User.findOneAndUpdate(
+      { email: 'admin@resolveit.com' },
+      {
+        name: 'System Administrator',
+        email: 'admin@resolveit.com',
+        password: hashedPassword,
+        role: 'admin',
+        phone: '+15550000000',
+        age: 30,
+        gender: 'prefer-not-to-say',
+        address: {
+          street: 'System Address',
+          city: 'System City',
+          zipCode: '00000',
+          state: 'System State'
+        },
+        isVerified: true
+      },
+      { upsert: true, new: true }
+    );
+    
+    console.log('✅ Default admin user ready');
+    console.log('📧 Email: admin@resolveit.com');
+    console.log('🔑 Password: admin123');
+  } catch (error) {
+    console.error('❌ Error setting up default admin:', error.message);
+  }
+}
+
+// Connect to database
+connectDB().then(() => {
+  // Create default admin after database connection
+  createDefaultAdmin();
+});
 
 // Security middleware
 app.use(helmet({
@@ -48,47 +77,38 @@ app.use(helmet({
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  origin: process.env.FRONTEND_URL || "http://localhost:8080",
+  credentials: true
 }));
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    message: 'Too many requests from this IP, please try again later.'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.'
 });
-
 app.use('/api/', limiter);
-
-// Compression middleware
-app.use(compression());
-
-// Logging middleware
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-} else {
-  app.use(morgan('combined'));
-}
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Serve static files (uploaded files)
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+// Serve uploaded files with custom middleware
+app.use(serveUploads);
+
+// Compression middleware
+app.use(compression());
+
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({
+app.get('/api/health', (req, res) => {
+  res.json({
     success: true,
     message: 'ResolveIt API is running',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
+    environment: process.env.NODE_ENV || 'development'
   });
 });
 
@@ -99,93 +119,30 @@ app.use('/api/admin', adminRoutes);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
-
-  // Join user to their personal room
-  socket.on('join-user', (userId) => {
-    socket.join(`user-${userId}`);
-    console.log(`User ${userId} joined their room`);
+  console.log('User connected:', socket.id);
+  
+  socket.on('join-case', (caseId) => {
+    socket.join(`case-${caseId}`);
+    console.log(`User ${socket.id} joined case ${caseId}`);
   });
-
-  // Join admin to admin room
-  socket.on('join-admin', () => {
-    socket.join('admin-room');
-    console.log('Admin joined admin room');
+  
+  socket.on('leave-case', (caseId) => {
+    socket.leave(`case-${caseId}`);
+    console.log(`User ${socket.id} left case ${caseId}`);
   });
-
-  // Handle case status updates
-  socket.on('case-status-update', (data) => {
-    // Notify user about their case update
-    socket.to(`user-${data.userId}`).emit('case-updated', data);
-    
-    // Notify admins about case updates
-    socket.to('admin-room').emit('case-updated', data);
-  });
-
-  // Handle new case notifications
-  socket.on('new-case', (data) => {
-    // Notify admins about new case
-    socket.to('admin-room').emit('new-case', data);
-  });
-
+  
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+    console.log('User disconnected:', socket.id);
   });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
-
-  // Handle multer errors
-  if (err.name === 'MulterError') {
-    return res.status(400).json({
-      success: false,
-      message: 'File upload error',
-      error: err.message
-    });
-  }
-
-  // Handle validation errors
-  if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      success: false,
-      message: 'Validation error',
-      error: err.message
-    });
-  }
-
-  // Handle JWT errors
-  if (err.name === 'JsonWebTokenError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid token'
-    });
-  }
-
-  // Handle JWT expiration
-  if (err.name === 'TokenExpiredError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Token expired'
-    });
-  }
-
-  // Handle MongoDB errors
-  if (err.name === 'MongoError' || err.name === 'MongoServerError') {
-    if (err.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: 'Duplicate field value'
-      });
-    }
-  }
-
-  // Default error
+  console.error(err.stack);
   res.status(500).json({
     success: false,
-    message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+    message: 'Something went wrong!',
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
   });
 });
 
@@ -197,28 +154,13 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start server
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-  console.log(`🚀 ResolveIt API Server running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
-  });
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  server.close(() => {
-    console.log('Process terminated');
-  });
+  console.log(`🚀 ResolveIt API server running on port ${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📡 API URL: http://localhost:${PORT}/api`);
+  console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:8080'}`);
 });
 
 export { io }; 

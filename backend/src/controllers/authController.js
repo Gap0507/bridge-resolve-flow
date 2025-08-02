@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 
 // Configure email transporter
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
   secure: false,
@@ -33,7 +33,8 @@ export const register = async (req, res) => {
     // Create verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
 
-    // Create user
+    // Create user with auto-verification in development
+    const isDevelopment = process.env.NODE_ENV === 'development';
     const user = await User.create({
       email,
       password,
@@ -42,30 +43,40 @@ export const register = async (req, res) => {
       gender,
       address,
       phone,
-      verificationToken
+      verificationToken: isDevelopment ? undefined : verificationToken,
+      isVerified: isDevelopment // Auto-verify in development
     });
 
     // Generate JWT token
     const token = generateToken(user._id);
 
-    // Send verification email
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
-    
-    await transporter.sendMail({
-      from: process.env.SMTP_USER,
-      to: email,
-      subject: 'Verify your ResolveIt account',
-      html: `
-        <h2>Welcome to ResolveIt!</h2>
-        <p>Please click the link below to verify your email address:</p>
-        <a href="${verificationUrl}">Verify Email</a>
-        <p>If you didn't create this account, please ignore this email.</p>
-      `
-    });
+    // Send verification email only in production
+    if (!isDevelopment) {
+      const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+      
+      try {
+        await transporter.sendMail({
+          from: process.env.SMTP_USER,
+          to: email,
+          subject: 'Verify your ResolveIt account',
+          html: `
+            <h2>Welcome to ResolveIt!</h2>
+            <p>Please click the link below to verify your email address:</p>
+            <a href="${verificationUrl}">Verify Email</a>
+            <p>If you didn't create this account, please ignore this email.</p>
+          `
+        });
+      } catch (emailError) {
+        console.error('Email sending failed:', emailError);
+        // Don't fail registration if email fails
+      }
+    }
 
     res.status(201).json({
       success: true,
-      message: 'User registered successfully. Please check your email to verify your account.',
+      message: isDevelopment 
+        ? 'User registered successfully. You can now log in.' 
+        : 'User registered successfully. Please check your email to verify your account.',
       data: {
         user: user.toJSON(),
         token
@@ -98,8 +109,8 @@ export const login = async (req, res) => {
       });
     }
 
-    // Check if user is verified
-    if (!user.isVerified) {
+    // Check if user is verified (only in production)
+    if (process.env.NODE_ENV !== 'development' && !user.isVerified) {
       return res.status(401).json({
         success: false,
         message: 'Please verify your email address before logging in'

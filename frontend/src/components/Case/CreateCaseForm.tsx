@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { casesApi, CreateCaseData, Witness } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Upload, X, Plus, FileText, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Upload, X, Plus, FileText, AlertCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface CreateCaseFormProps {
@@ -20,9 +21,10 @@ interface FileUpload {
   name: string;
   type: string;
   size: number;
+  file: File;
 }
 
-interface Witness {
+interface FormWitness {
   id: string;
   name: string;
   email: string;
@@ -32,6 +34,7 @@ interface Witness {
 
 export function CreateCaseForm({ onBack, onSubmit }: CreateCaseFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     caseType: '',
     title: '',
@@ -44,7 +47,7 @@ export function CreateCaseForm({ onBack, onSubmit }: CreateCaseFormProps) {
     courtName: '',
   });
   const [files, setFiles] = useState<FileUpload[]>([]);
-  const [witnesses, setWitnesses] = useState<Witness[]>([]);
+  const [witnesses, setWitnesses] = useState<FormWitness[]>([]);
   const [newWitness, setNewWitness] = useState({
     name: '',
     email: '',
@@ -64,7 +67,8 @@ export function CreateCaseForm({ onBack, onSubmit }: CreateCaseFormProps) {
       id: Math.random().toString(36).substr(2, 9),
       name: file.name,
       type: file.type,
-      size: file.size
+      size: file.size,
+      file: file
     }));
     setFiles(prev => [...prev, ...newFiles]);
   };
@@ -99,13 +103,67 @@ export function CreateCaseForm({ onBack, onSubmit }: CreateCaseFormProps) {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Case submitted successfully",
-      description: "Your case has been submitted for verification",
-    });
-    onSubmit();
+    setIsSubmitting(true);
+
+    try {
+      // Prepare case data
+      const caseData: CreateCaseData = {
+        caseType: formData.caseType as any,
+        title: formData.title,
+        description: formData.description,
+        oppositePartyName: formData.oppositePartyName,
+        oppositePartyEmail: formData.oppositePartyEmail,
+        oppositePartyPhone: formData.oppositePartyPhone,
+        isPendingInCourt: formData.isPendingInCourt,
+        firNumber: formData.firNumber || undefined,
+        courtName: formData.courtName || undefined,
+        witnesses: witnesses.map(w => ({
+          name: w.name,
+          email: w.email,
+          phone: w.phone,
+          relationship: w.relationship
+        }))
+      };
+
+      // Create case
+      const response = await casesApi.createCase(caseData);
+      
+      if (response.success && response.data?.case) {
+        const caseId = response.data.case._id;
+        
+        // Upload files if any
+        if (files.length > 0) {
+          try {
+            await casesApi.uploadFiles(caseId, files.map(f => f.file));
+          } catch (uploadError) {
+            console.error('File upload error:', uploadError);
+            toast({
+              title: "Warning",
+              description: "Case created but some files failed to upload. You can add them later.",
+              variant: "destructive",
+            });
+          }
+        }
+
+        toast({
+          title: "Case submitted successfully",
+          description: "Your case has been submitted for verification",
+        });
+        onSubmit();
+      } else {
+        throw new Error(response.message || 'Failed to create case');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to submit case. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const steps = [
@@ -571,8 +629,19 @@ export function CreateCaseForm({ onBack, onSubmit }: CreateCaseFormProps) {
                   Next
                 </Button>
               ) : (
-                <Button type="submit" variant="professional">
-                  Submit Case
+                <Button 
+                  type="submit" 
+                  variant="professional"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Case'
+                  )}
                 </Button>
               )}
             </div>

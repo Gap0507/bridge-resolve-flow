@@ -1,5 +1,4 @@
 import { body, validationResult } from 'express-validator';
-import { sanitize } from 'express-validator';
 
 // Handle validation errors
 export const handleValidationErrors = (req, res, next) => {
@@ -45,9 +44,7 @@ export const validateUserRegistration = [
   body('name')
     .trim()
     .isLength({ min: 2, max: 100 })
-    .withMessage('Name must be between 2 and 100 characters')
-    .matches(/^[a-zA-Z\s]+$/)
-    .withMessage('Name can only contain letters and spaces'),
+    .withMessage('Name must be between 2 and 100 characters'),
   
   body('email')
     .isEmail()
@@ -55,14 +52,13 @@ export const validateUserRegistration = [
     .withMessage('Please provide a valid email address'),
   
   body('phone')
+    .optional()
     .matches(/^[\+]?[1-9][\d]{0,15}$/)
     .withMessage('Please provide a valid phone number'),
   
   body('password')
-    .isLength({ min: 8 })
-    .withMessage('Password must be at least 8 characters long')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters long'),
   
   body('age')
     .optional()
@@ -74,25 +70,7 @@ export const validateUserRegistration = [
     .isIn(['male', 'female', 'other', 'prefer-not-to-say'])
     .withMessage('Invalid gender selection'),
   
-  body('address.street')
-    .trim()
-    .isLength({ min: 5, max: 200 })
-    .withMessage('Street address must be between 5 and 200 characters'),
-  
-  body('address.city')
-    .trim()
-    .isLength({ min: 2, max: 100 })
-    .withMessage('City must be between 2 and 100 characters'),
-  
-  body('address.zipCode')
-    .trim()
-    .matches(/^\d{5}(-\d{4})?$/)
-    .withMessage('Please provide a valid ZIP code'),
-  
-  body('address.state')
-    .trim()
-    .isLength({ min: 2, max: 50 })
-    .withMessage('State must be between 2 and 50 characters'),
+
   
   handleValidationErrors
 ];

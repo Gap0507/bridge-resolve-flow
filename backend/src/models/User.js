@@ -21,22 +21,18 @@ const userSchema = new mongoose.Schema({
   address: {
     street: {
       type: String,
-      required: [true, 'Street address is required'],
       trim: true
     },
     city: {
       type: String,
-      required: [true, 'City is required'],
       trim: true
     },
     zipCode: {
       type: String,
-      required: [true, 'ZIP code is required'],
       trim: true
     },
     state: {
       type: String,
-      required: [true, 'State is required'],
       trim: true
     }
   },
@@ -50,7 +46,6 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: [true, 'Phone number is required'],
     trim: true,
     match: [/^[\+]?[1-9][\d]{0,15}$/, 'Please enter a valid phone number']
   },
@@ -61,7 +56,7 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: [true, 'Password is required'],
-    minlength: [8, 'Password must be at least 8 characters long'],
+    minlength: [6, 'Password must be at least 6 characters long'],
     select: false
   },
   role: {

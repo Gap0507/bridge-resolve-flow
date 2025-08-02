@@ -1,25 +1,38 @@
 import multer from 'multer';
-import { v2 as cloudinary } from 'cloudinary';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import path from 'path';
+import fs from 'fs';
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
+// Ensure uploads directory exists
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
-// Configure Cloudinary storage
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: 'resolveit',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'mp4', 'mp3', 'wav'],
-    transformation: [
-      { width: 1000, height: 1000, crop: 'limit' }, // Limit image size
-      { quality: 'auto' } // Auto optimize quality
-    ]
+// Configure storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // Create subdirectories based on file type
+    let subDir = 'documents';
+    if (file.mimetype.startsWith('image/')) {
+      subDir = 'images';
+    } else if (file.mimetype.startsWith('video/')) {
+      subDir = 'videos';
+    } else if (file.mimetype.startsWith('audio/')) {
+      subDir = 'audio';
+    }
+    
+    const uploadPath = path.join(uploadsDir, subDir);
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const name = path.basename(file.originalname, ext);
+    cb(null, `${name}-${uniqueSuffix}${ext}`);
   }
 });
 
@@ -35,9 +48,16 @@ const upload = multer({
       'image/jpeg',
       'image/png',
       'image/gif',
+      'image/webp',
       'video/mp4',
+      'video/avi',
+      'video/mov',
       'audio/mpeg',
-      'application/pdf'
+      'audio/wav',
+      'audio/mp3',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     ];
 
     if (allowedTypes.includes(file.mimetype)) {
@@ -54,55 +74,51 @@ export const uploadSingle = upload.single('file');
 // Multiple files upload middleware
 export const uploadMultiple = upload.array('files', 10);
 
-// Delete file from Cloudinary
-export const deleteFile = async (publicId) => {
+// Delete file from local storage
+export const deleteFile = async (filePath) => {
   try {
-    const result = await cloudinary.uploader.destroy(publicId);
-    return result;
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      return { success: true };
+    }
+    return { success: false, message: 'File not found' };
   } catch (error) {
-    console.error('Error deleting file from Cloudinary:', error);
+    console.error('Error deleting file:', error);
     throw error;
   }
 };
 
-// Get file info from Cloudinary
-export const getFileInfo = async (publicId) => {
+// Get file info from local storage
+export const getFileInfo = async (filePath) => {
   try {
-    const result = await cloudinary.api.resource(publicId);
-    return result;
+    if (fs.existsSync(filePath)) {
+      const stats = fs.statSync(filePath);
+      return {
+        size: stats.size,
+        created: stats.birthtime,
+        modified: stats.mtime
+      };
+    }
+    throw new Error('File not found');
   } catch (error) {
-    console.error('Error getting file info from Cloudinary:', error);
+    console.error('Error getting file info:', error);
     throw error;
   }
-};
-
-// Generate signed upload URL for direct upload
-export const generateUploadSignature = (params = {}) => {
-  const timestamp = Math.round(new Date().getTime() / 1000);
-  const signature = cloudinary.utils.api_sign_request(
-    {
-      timestamp,
-      ...params
-    },
-    process.env.CLOUDINARY_API_SECRET
-  );
-
-  return {
-    timestamp,
-    signature,
-    apiKey: process.env.CLOUDINARY_API_KEY,
-    cloudName: process.env.CLOUDINARY_CLOUD_NAME
-  };
 };
 
 // Process uploaded file data
 export const processUploadedFile = (file) => {
   if (!file) return null;
 
+  // Create relative URL for frontend access
+  const relativePath = file.path.replace(process.cwd(), '').replace(/\\/g, '/');
+  const fileUrl = `/uploads${relativePath}`;
+
   return {
     name: file.originalname,
     type: getFileType(file.mimetype),
-    url: file.path,
+    url: fileUrl,
+    path: file.path, // Store actual file path for backend operations
     size: file.size,
     uploadedAt: new Date()
   };
@@ -113,7 +129,7 @@ const getFileType = (mimeType) => {
   if (mimeType.startsWith('image/')) return 'image';
   if (mimeType.startsWith('video/')) return 'video';
   if (mimeType.startsWith('audio/')) return 'audio';
-  if (mimeType === 'application/pdf') return 'document';
+  if (mimeType === 'application/pdf' || mimeType.includes('word')) return 'document';
   return 'document';
 };
 
@@ -129,9 +145,16 @@ export const validateFileType = (file) => {
     'image/jpeg',
     'image/png',
     'image/gif',
+    'image/webp',
     'video/mp4',
+    'video/avi',
+    'video/mov',
     'audio/mpeg',
-    'application/pdf'
+    'audio/wav',
+    'audio/mp3',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   ];
   return allowedTypes.includes(file.mimetype);
 };
@@ -170,4 +193,16 @@ export const handleFileUploadError = (error, req, res, next) => {
     success: false,
     message: 'File upload failed'
   });
+};
+
+// Serve static files middleware
+export const serveUploads = (req, res, next) => {
+  // Serve uploaded files statically
+  if (req.path.startsWith('/uploads/')) {
+    const filePath = path.join(process.cwd(), req.path);
+    if (fs.existsSync(filePath)) {
+      return res.sendFile(filePath);
+    }
+  }
+  next();
 }; 

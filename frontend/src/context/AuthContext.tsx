@@ -1,82 +1,94 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-
-interface User {
-  id: string;
-  email: string;
-  role: 'user' | 'admin';
-  name: string;
-  avatar?: string;
-}
+import { authApi, User } from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
+  isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demo
-const mockUsers = [
-  {
-    id: '1',
-    email: 'user@demo.com',
-    password: 'password123',
-    role: 'user' as const,
-    name: 'John Doe',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face'
-  },
-  {
-    id: '2',
-    email: 'admin@demo.com',
-    password: 'admin123',
-    role: 'admin' as const,
-    name: 'Sarah Admin',
-    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face'
-  }
-];
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
+  // Check authentication status on mount
   useEffect(() => {
-    // Check if user is logged in from localStorage
-    const savedUser = localStorage.getItem('resolveIt_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
+    const checkAuth = async () => {
+      try {
+        if (authApi.isAuthenticated()) {
+          const response = await authApi.getProfile();
+          if (response.success && response.data?.user) {
+            setUser(response.data.user);
+          } else {
+            // Token is invalid, clear it
+            authApi.logout();
+          }
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+        authApi.logout();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkAuth();
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    const mockUser = mockUsers.find(u => u.email === email && u.password === password);
-    
-    if (mockUser) {
-      const userData = {
-        id: mockUser.id,
-        email: mockUser.email,
-        role: mockUser.role,
-        name: mockUser.name,
-        avatar: mockUser.avatar
-      };
+    try {
+      const response = await authApi.login({ email, password });
       
-      setUser(userData);
-      localStorage.setItem('resolveIt_user', JSON.stringify(userData));
-      return true;
+      if (response.success && response.data?.user) {
+        setUser(response.data.user);
+        toast({
+          title: "Login successful",
+          description: "Welcome to ResolveIt",
+        });
+        return true;
+      } else {
+        toast({
+          title: "Login failed",
+          description: response.message || "Invalid credentials",
+          variant: "destructive",
+        });
+        return false;
+      }
+    } catch (error: any) {
+      toast({
+        title: "Login failed",
+        description: error.message || "An error occurred during login",
+        variant: "destructive",
+      });
+      return false;
     }
-    
-    return false;
   };
 
   const logout = () => {
+    authApi.logout();
     setUser(null);
-    localStorage.removeItem('resolveIt_user');
+    toast({
+      title: "Logged out",
+      description: "You have been successfully logged out",
+    });
   };
 
+  const isAuthenticated = !!user;
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      login, 
+      logout, 
+      isLoading,
+      isAuthenticated 
+    }}>
       {children}
     </AuthContext.Provider>
   );
