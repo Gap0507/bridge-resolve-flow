@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { LoginForm } from '@/components/Auth/LoginForm';
 import { UserDashboard } from '@/components/Dashboard/UserDashboard';
 import { AdminDashboard } from '@/components/Admin/AdminDashboard';
@@ -79,11 +79,7 @@ function AppContent() {
 }
 
 const Index = () => {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  );
+  return <AppContent />;
 };
 
 export default Index;

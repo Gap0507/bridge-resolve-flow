@@ -1,379 +1,808 @@
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
-import { casesApi, Case } from '@/services/api';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Plus, FileText, Clock, CheckCircle, XCircle, AlertCircle, Eye, Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { casesApi, authApi, type Case, type User } from '@/services/api';
+import { 
+  Plus, 
+  FileText, 
+  Clock, 
+  CheckCircle, 
+  XCircle, 
+  AlertCircle, 
+  Eye, 
+  Loader2,
+  TrendingUp,
+  Users,
+  Shield,
+  Bell,
+  Settings,
+  LogOut,
+  Search,
+  Filter,
+  Calendar,
+  MapPin,
+  Phone,
+  Mail,
+  Star,
+  Award,
+  Zap,
+  Sparkles,
+  Home,
+  BarChart3,
+  FolderOpen,
+  Activity,
+  PieChart,
+  Target,
+  CheckSquare,
+  AlertTriangle,
+  UserCheck,
+  FileCheck,
+  CalendarDays,
+  Clock3,
+  Scale,
+  Menu,
+  X
+} from 'lucide-react';
 
+// Types
 interface UserDashboardProps {
   onCreateCase: () => void;
   onViewCase: (caseId: string) => void;
 }
 
 const statusConfig = {
-  'Pending Verification': { color: 'bg-warning', icon: AlertCircle, label: 'Pending' },
-  'Verified': { color: 'bg-primary', icon: CheckCircle, label: 'Verified' },
-  'Awaiting Response': { color: 'bg-warning', icon: Clock, label: 'Awaiting' },
-  'Accepted': { color: 'bg-success', icon: CheckCircle, label: 'Accepted' },
-  'Rejected': { color: 'bg-destructive', icon: XCircle, label: 'Rejected' },
-  'Panel Created': { color: 'bg-primary', icon: CheckCircle, label: 'Panel Created' },
-  'Mediation in Progress': { color: 'bg-primary', icon: Clock, label: 'In Progress' },
-  'Resolved': { color: 'bg-success', icon: CheckCircle, label: 'Resolved' },
-  'Unresolved': { color: 'bg-destructive', icon: XCircle, label: 'Unresolved' },
+  'Pending Verification': { 
+    color: 'bg-amber-500/10 text-amber-600 border-amber-500/20', 
+    icon: AlertCircle, 
+    label: 'Pending',
+    gradient: 'from-amber-500 to-orange-500'
+  },
+  'Verified': { 
+    color: 'bg-blue-500/10 text-blue-600 border-blue-500/20', 
+    icon: CheckCircle, 
+    label: 'Verified',
+    gradient: 'from-blue-500 to-cyan-500'
+  },
+  'Awaiting Response': { 
+    color: 'bg-orange-500/10 text-orange-600 border-orange-500/20', 
+    icon: Clock, 
+    label: 'Awaiting',
+    gradient: 'from-orange-500 to-red-500'
+  },
+  'Accepted': { 
+    color: 'bg-green-500/10 text-green-600 border-green-500/20', 
+    icon: CheckCircle, 
+    label: 'Accepted',
+    gradient: 'from-green-500 to-emerald-500'
+  },
+  'Rejected': { 
+    color: 'bg-red-500/10 text-red-600 border-red-500/20', 
+    icon: XCircle, 
+    label: 'Rejected',
+    gradient: 'from-red-500 to-pink-500'
+  },
+  'Panel Created': { 
+    color: 'bg-purple-500/10 text-purple-600 border-purple-500/20', 
+    icon: Users, 
+    label: 'Panel Created',
+    gradient: 'from-purple-500 to-indigo-500'
+  },
+  'Mediation in Progress': { 
+    color: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20', 
+    icon: Clock, 
+    label: 'In Progress',
+    gradient: 'from-indigo-500 to-blue-500'
+  },
+  'Resolved': { 
+    color: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20', 
+    icon: CheckCircle, 
+    label: 'Resolved',
+    gradient: 'from-emerald-500 to-green-500'
+  },
+  'Unresolved': { 
+    color: 'bg-red-500/10 text-red-600 border-red-500/20', 
+    icon: XCircle, 
+    label: 'Unresolved',
+    gradient: 'from-red-500 to-rose-500'
+  },
 };
 
-export function UserDashboard({ onCreateCase, onViewCase }: UserDashboardProps) {
-  const { user, logout } = useAuth();
-  const { toast } = useToast();
-  const [cases, setCases] = useState<Case[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+type DashboardView = 'overview' | 'cases' | 'analytics' | 'activity';
 
-  useEffect(() => {
-    loadUserCases();
-  }, []);
+// Mock Components
+const Badge = ({ children, className, variant }: any) => (
+  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}>
+    {children}
+  </span>
+);
 
-  const loadUserCases = async () => {
-    try {
-      setIsLoading(true);
-      setError('');
-      const response = await casesApi.getUserCases();
-      if (response.success && response.data?.cases) {
-        setCases(response.data.cases);
-      } else {
-        setError('Failed to load cases');
-      }
-    } catch (error: any) {
-      setError(error.message || 'Failed to load cases');
-      toast({
-        title: "Error",
-        description: "Failed to load your cases. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+const Button = ({ children, className, variant = 'default', size = 'default', onClick, ...props }: any) => {
+  const baseClass = "inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none";
+  const variants = {
+    default: "bg-blue-600 text-white hover:bg-blue-700",
+    outline: "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
+    ghost: "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
   };
+  const sizes = {
+    default: "h-10 py-2 px-4",
+    sm: "h-9 px-3 text-sm",
+    lg: "h-11 px-8"
+  };
+  
+  return (
+    <button 
+      className={`${baseClass} ${variants[variant]} ${sizes[size]} ${className}`}
+      onClick={onClick}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+};
+
+const Card = ({ children, className }: any) => (
+  <div className={`rounded-lg border bg-card text-card-foreground shadow-sm bg-white border-gray-200 ${className}`}>
+    {children}
+  </div>
+);
+
+const CardHeader = ({ children, className }: any) => (
+  <div className={`flex flex-col space-y-1.5 p-6 ${className}`}>
+    {children}
+  </div>
+);
+
+const CardTitle = ({ children, className }: any) => (
+  <h3 className={`text-2xl font-semibold leading-none tracking-tight ${className}`}>
+    {children}
+  </h3>
+);
+
+const CardDescription = ({ children, className }: any) => (
+  <p className={`text-sm text-muted-foreground text-gray-500 ${className}`}>
+    {children}
+  </p>
+);
+
+const CardContent = ({ children, className }: any) => (
+  <div className={`p-6 pt-0 ${className}`}>
+    {children}
+  </div>
+);
+
+const Avatar = ({ children, className }: any) => (
+  <div className={`relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full ${className}`}>
+    {children}
+  </div>
+);
+
+const AvatarFallback = ({ children, className }: any) => (
+  <div className={`flex h-full w-full items-center justify-center rounded-full bg-muted ${className}`}>
+    {children}
+  </div>
+);
+
+export function UserDashboard({ onCreateCase = () => {}, onViewCase = () => {} }: UserDashboardProps) {
+  const { user, logout } = useAuth();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [currentView, setCurrentView] = useState<DashboardView>('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Fetch user cases using React Query
+  const { 
+    data: casesData, 
+    isLoading: casesLoading, 
+    error: casesError,
+    refetch: refetchCases 
+  } = useQuery({
+    queryKey: ['userCases', statusFilter],
+    queryFn: async () => {
+      const response = await casesApi.getUserCases({
+        status: statusFilter === 'all' ? undefined : statusFilter,
+        limit: 100 // Get all cases for dashboard
+      });
+      return response.data;
+    },
+    enabled: !!user, // Only fetch if user is authenticated
+  });
+
+  const cases = casesData?.cases || [];
+  const isLoading = casesLoading;
+  const error = casesError?.message || '';
 
   const getStatusBadge = (status: Case['status']) => {
     const config = statusConfig[status];
     const Icon = config.icon;
     
     return (
-      <Badge variant="secondary" className={`${config.color} text-white`}>
+      <Badge className={`${config.color} border font-medium`}>
         <Icon className="w-3 h-3 mr-1" />
         {config.label}
       </Badge>
     );
   };
 
+  const filteredCases = cases.filter(case_ => {
+    const matchesSearch = case_.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         case_.oppositePartyName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || case_.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
   const stats = {
     total: cases.length,
     pending: cases.filter(c => c.status === 'Pending Verification').length,
     inProgress: cases.filter(c => ['Awaiting Response', 'Panel Created', 'Mediation in Progress'].includes(c.status)).length,
     resolved: cases.filter(c => c.status === 'Resolved').length,
+    unresolved: cases.filter(c => c.status === 'Unresolved').length,
+  };
+
+  const recentCases = cases.slice(0, 3);
+  const activeCases = cases.filter(c => ['Awaiting Response', 'Panel Created', 'Mediation in Progress'].includes(c.status));
+
+  const navigationItems = [
+    { id: 'overview', label: 'Overview', icon: Home, count: null },
+    { id: 'cases', label: 'All Cases', icon: FolderOpen, count: cases.length },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3, count: null },
+    { id: 'activity', label: 'Recent Activity', icon: Activity, count: recentCases.length },
+  ];
+
+  const handleLogout = () => {
+    logout();
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        {/* Header */}
-        <header className="glass border-b border-white/10 sticky top-0 z-50 backdrop-blur-xl">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gradient-hero rounded-xl flex items-center justify-center shadow-lg shadow-primary/25">
-                  <FileText className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-                    ResolveIt
-                  </h1>
-                  <p className="text-xs text-muted-foreground">Dispute Resolution Platform</p>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-4">
-                <Avatar className="ring-2 ring-primary/20">
-                  <AvatarImage src={user?.photo} alt={user?.name} />
-                  <AvatarFallback className="bg-gradient-primary text-white">
-                    {user?.name?.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="text-right hidden sm:block">
-                  <p className="text-sm font-semibold text-foreground">{user?.name}</p>
-                  <p className="text-xs text-muted-foreground">{user?.email}</p>
-                </div>
-                <Button variant="glass" onClick={logout}>
-                  Logout
-                </Button>
-              </div>
-            </div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-blue-400 rounded-full animate-spin mx-auto" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
           </div>
-        </header>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-              <p className="text-muted-foreground">Loading your dashboard...</p>
-            </div>
-          </div>
+          <p className="text-gray-600 font-medium">Loading your dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="glass border-b border-white/10 sticky top-0 z-50 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-gradient-hero rounded-xl flex items-center justify-center shadow-lg shadow-primary/25">
-                <FileText className="w-6 h-6 text-white" />
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-xl transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}>
+        <div className="flex flex-col h-full">
+          {/* Logo Section */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg">
+                <Scale className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-                  ResolveIt
-                </h1>
-                <p className="text-xs text-muted-foreground">Dispute Resolution Platform</p>
+                <h1 className="text-lg font-bold text-gray-900">ResolveIt</h1>
+                <p className="text-xs text-gray-500">Dispute Resolution</p>
               </div>
             </div>
-            
-            <div className="flex items-center space-x-4">
-              <Avatar className="ring-2 ring-primary/20">
-                <AvatarImage src={user?.photo} alt={user?.name} />
-                <AvatarFallback className="bg-gradient-primary text-white">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="lg:hidden"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
+
+          {/* User Profile Section */}
+          <div className="p-6 border-b border-gray-100">
+            <div className="flex items-center space-x-3 mb-4">
+              <Avatar className="w-12 h-12 ring-2 ring-blue-100">
+                <AvatarFallback className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-sm">
                   {user?.name?.charAt(0)}
                 </AvatarFallback>
               </Avatar>
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-foreground">{user?.name}</p>
-                <p className="text-xs text-muted-foreground">{user?.email}</p>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-gray-900 truncate">{user?.name}</h3>
+                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
               </div>
-              <Button variant="glass" onClick={logout}>
-                Logout
+            </div>
+            
+            <Button 
+              onClick={onCreateCase}
+              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-sm"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create New Case
+            </Button>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 p-4 space-y-1">
+            {navigationItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setCurrentView(item.id as DashboardView)}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-all duration-200 ${
+                    currentView === item.id
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    <Icon className="w-5 h-5" />
+                    <span className="font-medium">{item.label}</span>
+                  </div>
+                  {item.count !== null && (
+                    <Badge className={`${
+                      currentView === item.id 
+                        ? 'bg-blue-100 text-blue-700' 
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {item.count}
+                    </Badge>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Stats Summary */}
+          <div className="p-4 border-t border-gray-100">
+            <div className="bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200 rounded-lg p-4">
+              <h4 className="font-medium text-gray-900 mb-3 text-sm">Quick Stats</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Total Cases</span>
+                  <span className="font-semibold text-gray-900">{stats.total}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Active</span>
+                  <span className="font-semibold text-blue-600">{stats.inProgress}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Resolved</span>
+                  <span className="font-semibold text-green-600">{stats.resolved}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Logout Button */}
+            <Button 
+              variant="ghost" 
+              onClick={handleLogout} 
+              className="w-full mt-4 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
+        {/* Header */}
+        <header className="bg-white shadow-sm border-b border-gray-200 px-4 py-4 lg:px-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="lg:hidden"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="w-5 h-5" />
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Welcome back, {user?.name?.split(' ')[0]}!
+                </h1>
+                <p className="text-sm text-gray-600">
+                  Your comprehensive dashboard for managing disputes and tracking resolution progress
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <Button variant="ghost" size="sm">
+                <Bell className="w-5 h-5" />
+              </Button>
+              <Button variant="ghost" size="sm">
+                <Settings className="w-5 h-5" />
               </Button>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <div className="mb-12 animate-fade-in">
-          <div className="text-center mb-8">
-            <h2 className="text-4xl font-bold bg-gradient-to-r from-foreground via-primary to-primary-glow bg-clip-text text-transparent mb-4">
-              Welcome back, {user?.name?.split(' ')[0]} ✨
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Your comprehensive dashboard for managing disputes and tracking resolution progress
-            </p>
-          </div>
-        </div>
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8">
+          {/* Content based on current view */}
+          {currentView === 'overview' && (
+            <div className="space-y-8">
+{/* Stats Cards */}
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="group hover:shadow-xl transition-all duration-300 border-0 bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-2xl font-bold text-blue-700 mt-10">{stats.total}</p>
+                        <p className="text-xs text-blue-600 font-medium">Total Cases</p>
+                      </div>
+                      <div className="p-2 bg-blue-200 rounded-xl group-hover:scale-110 transition-transform duration-300 mt-10">
+                        <FileText className="w-5 h-5 text-blue-700" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="group hover:shadow-xl transition-all duration-300 border-0 bg-gradient-to-br from-amber-50 to-amber-100 rounded-2xl">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-2xl font-bold text-amber-700 mt-10">{stats.pending}</p>
+                        <p className="text-xs text-amber-600 font-medium">Pending Review</p>
+                      </div>
+                      <div className="p-2 bg-amber-200 rounded-xl group-hover:scale-110 transition-transform duration-300 mt-10">
+                        <Clock className="w-5 h-5 text-amber-700" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="group hover:shadow-xl transition-all duration-300 border-0 bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-2xl font-bold text-purple-700 mt-10">{stats.inProgress}</p>
+                        <p className="text-xs text-purple-600 font-medium">In Progress</p>
+                      </div>
+                      <div className="p-2 bg-purple-200 rounded-xl group-hover:scale-110 transition-transform duration-300 mt-10">
+                        <TrendingUp className="w-5 h-5 text-purple-700" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="group hover:shadow-xl transition-all duration-300 border-0 bg-gradient-to-br from-green-50 to-green-100 rounded-2xl">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-2xl font-bold text-green-700 mt-10">{stats.resolved}</p>
+                        <p className="text-xs text-green-600 font-medium">Resolved</p>
+                      </div>
+                      <div className="p-2 bg-green-200 rounded-xl group-hover:scale-110 transition-transform duration-300 mt-10">
+                        <CheckCircle className="w-5 h-5 text-green-700" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 animate-slide-up">
-          <Card className="glass hover-lift border-primary/20 bg-gradient-card">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-3xl font-bold text-foreground mb-1">{stats.total}</p>
-                  <p className="text-sm text-muted-foreground font-medium">Total Cases</p>
-                </div>
-                <div className="p-3 bg-gradient-primary rounded-xl shadow-lg shadow-primary/25">
-                  <FileText className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-border/50">
-                <p className="text-xs text-muted-foreground">📊 All time</p>
-              </div>
-            </CardContent>
-          </Card>
+              {/* Recent Activity & Active Cases */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Recent Activity */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-lg text-gray-900">
+                      <Zap className="w-5 h-5 text-yellow-500" />
+                      <span>Recent Activity</span>
+                    </CardTitle>
+                    <CardDescription>Latest updates on your cases</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {recentCases.length === 0 ? (
+                        <div className="text-center py-8 flex flex-col items-center justify-center">
+                          <FileText className="w-12 h-12 text-gray-400 mb-4" />
+                          <p className="text-gray-500">No recent activity</p>
+                        </div>
+                      ) : (
+                        recentCases.map((case_, index) => (
+                          <div key={case_._id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                            <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${statusConfig[case_.status].gradient}`}></div>
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-900">{case_.title}</h4>
+                              <p className="text-sm text-gray-500">
+                                {case_.caseType} • {new Date(case_.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            {getStatusBadge(case_.status)}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
 
-          <Card className="glass hover-lift border-warning/20 bg-gradient-card">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-3xl font-bold text-foreground mb-1">{stats.pending}</p>
-                  <p className="text-sm text-muted-foreground font-medium">Pending Review</p>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-warning to-orange-400 rounded-xl shadow-lg shadow-warning/25">
-                  <Clock className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-border/50">
-                <p className="text-xs text-muted-foreground">⏳ Awaiting verification</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="glass hover-lift border-blue-400/20 bg-gradient-card">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-3xl font-bold text-foreground mb-1">{stats.inProgress}</p>
-                  <p className="text-sm text-muted-foreground font-medium">In Progress</p>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg shadow-blue-500/25">
-                  <AlertCircle className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-border/50">
-                <p className="text-xs text-muted-foreground">🔄 Active cases</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="glass hover-lift border-success/20 bg-gradient-card">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-3xl font-bold text-foreground mb-1">{stats.resolved}</p>
-                  <p className="text-sm text-muted-foreground font-medium">Resolved</p>
-                </div>
-                <div className="p-3 bg-gradient-to-br from-success to-emerald-500 rounded-xl shadow-lg shadow-success/25">
-                  <CheckCircle className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <div className="mt-4 pt-4 border-t border-border/50">
-                <p className="text-xs text-muted-foreground">✅ Completed</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-6 mb-12 animate-scale-in">
-          <Button 
-            variant="premium" 
-            size="lg"
-            onClick={onCreateCase}
-            className="sm:w-auto w-full group"
-          >
-            <Plus className="w-5 h-5 mr-2 group-hover:rotate-90 transition-transform duration-200" />
-            Create New Case
-          </Button>
-          <Button 
-            variant="glass" 
-            size="lg"
-            className="sm:w-auto w-full"
-          >
-            <FileText className="w-5 h-5 mr-2" />
-            Case Templates
-          </Button>
-          <Button 
-            variant="outline" 
-            size="lg"
-            className="sm:w-auto w-full"
-          >
-            <AlertCircle className="w-5 h-5 mr-2" />
-            Help & Support
-          </Button>
-        </div>
-
-        {/* Cases List */}
-        <Card className="glass border-primary/20 bg-gradient-card animate-fade-in">
-          <CardHeader className="pb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
-                  Your Cases
-                </CardTitle>
-                <CardDescription className="text-muted-foreground mt-2">
-                  Track the progress of your dispute resolution cases
-                </CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="glass" size="sm" onClick={loadUserCases}>
-                  Refresh
-                </Button>
+                {/* Active Cases */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2 text-lg text-gray-900">
+                      <TrendingUp className="w-5 h-5 text-green-500" />
+                      <span>Active Cases</span>
+                    </CardTitle>
+                    <CardDescription>Cases currently in progress</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {activeCases.length === 0 ? (
+                        <div className="text-center py-8 flex flex-col items-center justify-center">
+                          <Clock className="w-12 h-12 text-gray-400 mb-4" />
+                          <p className="text-gray-500">No active cases</p>
+                        </div>
+                      ) : (
+                        activeCases.map((case_, index) => (
+                          <div key={case_._id} className="p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-semibold text-gray-900">{case_.title}</h4>
+                              {getStatusBadge(case_.status)}
+                            </div>
+                            <p className="text-sm text-gray-500 mb-3">
+                              vs. {case_.oppositePartyName}
+                            </p>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-400">
+                                {new Date(case_.createdAt).toLocaleDateString()}
+                              </span>
+                              <Button size="sm" variant="outline" onClick={() => onViewCase(case_._id)}>
+                                <Eye className="w-3 h-3 mr-1" />
+                                View
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            {error && (
-              <div className="text-center py-8">
-                <AlertCircle className="w-12 h-12 text-destructive mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">Error loading cases</h3>
-                <p className="text-muted-foreground mb-4">{error}</p>
-                <Button onClick={loadUserCases} variant="outline">
-                  Try Again
-                </Button>
-              </div>
-            )}
+          )}
 
-            {!error && cases.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="w-20 h-20 mx-auto mb-6 bg-gradient-primary rounded-full flex items-center justify-center shadow-lg shadow-primary/25">
-                  <FileText className="w-10 h-10 text-white" />
-                </div>
-                <h3 className="text-2xl font-bold mb-3 text-foreground">No cases yet</h3>
-                <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-                  Ready to resolve a dispute? Create your first case to get started with our resolution process.
-                </p>
-                <Button variant="premium" size="lg" onClick={onCreateCase}>
-                  <Plus className="w-5 h-5 mr-2" />
-                  Create Your First Case
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {cases.map((case_, index) => (
-                  <div 
-                    key={case_._id}
-                    className="glass border border-white/10 rounded-xl p-6 hover-lift group"
-                    style={{ animationDelay: `${index * 0.1}s` }}
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center space-x-3">
-                        <Badge variant="outline" className="bg-primary/10 border-primary/30 text-primary font-semibold">
-                          {case_.caseType}
-                        </Badge>
-                        {getStatusBadge(case_.status)}
-                      </div>
-                      <Button 
-                        variant="glass" 
-                        size="sm"
-                        onClick={() => onViewCase(case_._id)}
-                        className="group-hover:border-primary/40 transition-all duration-200"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        View Details
-                      </Button>
+          {currentView === 'cases' && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                    <div>
+                      <CardTitle className="text-2xl font-bold text-gray-900">All Cases</CardTitle>
+                      <CardDescription className="text-gray-600">
+                        Manage and track all your dispute resolution cases
+                      </CardDescription>
                     </div>
                     
-                    <h4 className="font-bold text-xl mb-3 text-foreground group-hover:text-primary transition-colors">
-                      {case_.title}
-                    </h4>
-                    <p className="text-muted-foreground text-sm mb-4 line-clamp-2 leading-relaxed">
-                      {case_.description}
-                    </p>
-                    
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <span className="font-medium">vs. {case_.oppositePartyName}</span>
+                    <div className="flex flex-col sm:flex-row gap-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search cases..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10 pr-4 py-2 w-full sm:w-64 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
                       </div>
-                      <div className="text-xs text-muted-foreground bg-muted/20 px-3 py-1 rounded-full">
-                        📅 {new Date(case_.createdAt).toLocaleDateString('en-US', { 
-                          month: 'short', 
-                          day: 'numeric', 
-                          year: 'numeric' 
-                        })}
-                      </div>
+                      
+                      <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-black"
+                      >
+                        <option value="all">All Statuses</option>
+                        <option value="Pending Verification">Pending Verification</option>
+                        <option value="Verified">Verified</option>
+                        <option value="Awaiting Response">Awaiting Response</option>
+                        <option value="Accepted">Accepted</option>
+                        <option value="Rejected">Rejected</option>
+                        <option value="Panel Created">Panel Created</option>
+                        <option value="Mediation in Progress">Mediation in Progress</option>
+                        <option value="Resolved">Resolved</option>
+                        <option value="Unresolved">Unresolved</option>
+                      </select>
                     </div>
                   </div>
-                ))}
+                </CardHeader>
+                <CardContent>
+                  {error && (
+                    <div className="text-center py-8 flex flex-col items-center justify-center">
+                      <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+                      <h3 className="text-lg font-medium mb-2 text-gray-900">Error loading cases</h3>
+                      <p className="text-gray-500 mb-4">{error}</p>
+                      <Button variant="outline" onClick={() => refetchCases()}>
+                        Try Again
+                      </Button>
+                    </div>
+                  )}
+
+                  {!error && filteredCases.length === 0 ? (
+                    <div className="text-center py-16 flex flex-col items-center justify-center">
+                      <div className="w-20 h-20 mb-6 bg-blue-100 rounded-full flex items-center justify-center">
+                        <FileText className="w-10 h-10 text-blue-600" />
+                      </div>
+                      <h3 className="text-2xl font-bold mb-3 text-gray-900">No cases found</h3>
+                      <p className="text-gray-500 mb-8 max-w-md">
+                        {cases.length === 0 
+                          ? "Ready to resolve a dispute? Create your first case to get started with our resolution process."
+                          : "Try adjusting your search or filter criteria"
+                        }
+                      </p>
+                      {cases.length === 0 && (
+                        <Button size="lg" onClick={onCreateCase} className="bg-blue-600 hover:bg-blue-700">
+                          <Plus className="w-5 h-5 mr-2" />
+                          Create Your First Case
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {filteredCases.map((case_, index) => (
+                        <div 
+                          key={case_._id}
+                          className="group bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:border-blue-300"
+                          style={{ animationDelay: `${index * 0.1}s` }}
+                        >
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center space-x-3">
+                              <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 font-semibold">
+                                {case_.caseType}
+                              </Badge>
+                              {getStatusBadge(case_.status)}
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => onViewCase(case_._id)}
+                              className="group-hover:border-blue-500 group-hover:text-blue-600 transition-all duration-200"
+                            >
+                              <Eye className="w-4 h-4 mr-2" />
+                              View Details
+                            </Button>
+                          </div>
+                          
+                          <h4 className="font-bold text-xl mb-3 text-gray-900 group-hover:text-blue-600 transition-colors">
+                            {case_.title}
+                          </h4>
+                          <p className="text-gray-600 text-sm mb-4 line-clamp-2 leading-relaxed">
+                            {case_.description}
+                          </p>
+                          
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center text-sm text-gray-500">
+                              <span className="font-medium text-gray-700">vs. {case_.oppositePartyName}</span>
+                            </div>
+                            <div className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
+                              📅 {new Date(case_.createdAt).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric', 
+                                year: 'numeric' 
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {currentView === 'analytics' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-gray-900">Resolution Rate</CardTitle>
+                    <CardDescription className="text-gray-600">Success rate of your case resolutions</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-gray-700">Resolved Cases</span>
+                        <span className="text-sm text-gray-500">
+                          {stats.resolved} / {stats.total}
+                        </span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div 
+                          className="bg-gradient-to-r from-emerald-500 to-green-600 h-3 rounded-full transition-all duration-500" 
+                          style={{ width: `${stats.total > 0 ? (stats.resolved / stats.total) * 100 : 0}%` }}
+                        />
+                      </div>
+                      <p className="text-2xl font-bold text-emerald-600">
+                        {stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 0}%
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-gray-900">Case Status Distribution</CardTitle>
+                    <CardDescription className="text-gray-600">Breakdown by case status</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {Object.entries({
+                        'Pending': stats.pending,
+                        'In Progress': stats.inProgress,
+                        'Resolved': stats.resolved,
+                        'Unresolved': stats.unresolved
+                      }).map(([status, count]) => {
+                        const percentage = stats.total > 0 ? (count / stats.total) * 100 : 0;
+                        
+                        return (
+                          <div key={status} className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-gray-700">{status}</span>
+                            <div className="flex items-center space-x-2">
+                              <div className="w-20 bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2 rounded-full transition-all duration-500" 
+                                  style={{ width: `${percentage}%` }}
+                                />
+                              </div>
+                              <span className="text-sm text-gray-500 w-8">
+                                {count}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
+
+          {currentView === 'activity' && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Activity className="w-5 h-5 text-blue-500" />
+                    <span>Recent Activity</span>
+                  </CardTitle>
+                  <CardDescription>Latest updates and timeline of your cases</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {recentCases.length === 0 ? (
+                      <div className="text-center py-8 flex flex-col items-center justify-center">
+                        <Activity className="w-12 h-12 text-gray-400 mb-4" />
+                        <p className="text-gray-500">No recent activity</p>
+                      </div>
+                    ) : (
+                      recentCases.map((case_, index) => (
+                        <div key={case_._id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                          <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${statusConfig[case_.status].gradient}`}></div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900">{case_.title}</h4>
+                            <p className="text-sm text-gray-500">
+                              {case_.caseType} • {new Date(case_.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          {getStatusBadge(case_.status)}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </main>
       </div>
+
+      {/* Sidebar Overlay for Mobile */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
     </div>
   );
 }

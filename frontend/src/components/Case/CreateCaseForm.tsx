@@ -8,7 +8,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Upload, X, Plus, FileText, AlertCircle, Loader2 } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  Upload, 
+  X, 
+  Plus, 
+  FileText, 
+  AlertCircle, 
+  Loader2,
+  Shield,
+  Users,
+  MapPin,
+  Phone,
+  Mail,
+  Calendar,
+  CheckCircle,
+  Clock,
+  Sparkles,
+  Zap,
+  Star,
+  Award,
+  TrendingUp,
+  Eye,
+  FileImage,
+  FileVideo,
+  FileAudio,
+  File,
+  Scale,
+  Menu
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface CreateCaseFormProps {
@@ -31,6 +59,67 @@ interface FormWitness {
   phone: string;
   relationship: string;
 }
+
+// Custom components matching UserDashboard style
+const CustomCard = ({ children, className }: any) => (
+  <div className={`rounded-lg border bg-card text-card-foreground shadow-sm bg-white border-gray-200 ${className}`}>
+    {children}
+  </div>
+);
+
+const CustomCardHeader = ({ children, className }: any) => (
+  <div className={`flex flex-col space-y-1.5 p-6 ${className}`}>
+    {children}
+  </div>
+);
+
+const CustomCardTitle = ({ children, className }: any) => (
+  <h3 className={`text-2xl font-semibold leading-none tracking-tight ${className}`}>
+    {children}
+  </h3>
+);
+
+const CustomCardDescription = ({ children, className }: any) => (
+  <p className={`text-sm text-muted-foreground text-gray-500 ${className}`}>
+    {children}
+  </p>
+);
+
+const CustomCardContent = ({ children, className }: any) => (
+  <div className={`p-6 pt-0 ${className}`}>
+    {children}
+  </div>
+);
+
+const CustomBadge = ({ children, className, variant }: any) => (
+  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${className}`}>
+    {children}
+  </span>
+);
+
+const CustomButton = ({ children, className, variant = 'default', size = 'default', onClick, ...props }: any) => {
+  const baseClass = "inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none";
+  const variants = {
+    default: "bg-blue-600 text-white hover:bg-blue-700",
+    outline: "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50",
+    ghost: "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+  };
+  const sizes = {
+    default: "h-10 py-2 px-4",
+    sm: "h-9 px-3 text-sm",
+    lg: "h-11 px-8"
+  };
+  
+  return (
+    <button 
+      className={`${baseClass} ${variants[variant]} ${sizes[size]} ${className}`}
+      onClick={onClick}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+};
 
 export function CreateCaseForm({ onBack, onSubmit }: CreateCaseFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
@@ -60,6 +149,13 @@ export function CreateCaseForm({ onBack, onSubmit }: CreateCaseFormProps) {
   const caseTypes = [
     'Family', 'Business', 'Criminal', 'Property', 'Employment', 'Other'
   ];
+
+  const getFileIcon = (type: string) => {
+    if (type.startsWith('image/')) return <FileImage className="w-4 h-4" />;
+    if (type.startsWith('video/')) return <FileVideo className="w-4 h-4" />;
+    if (type.startsWith('audio/')) return <FileAudio className="w-4 h-4" />;
+    return <File className="w-4 h-4" />;
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFiles = Array.from(e.target.files || []);
@@ -120,6 +216,7 @@ export function CreateCaseForm({ onBack, onSubmit }: CreateCaseFormProps) {
         firNumber: formData.firNumber || undefined,
         courtName: formData.courtName || undefined,
         witnesses: witnesses.map(w => ({
+          _id: w.id,
           name: w.name,
           email: w.email,
           phone: w.phone,
@@ -167,486 +264,630 @@ export function CreateCaseForm({ onBack, onSubmit }: CreateCaseFormProps) {
   };
 
   const steps = [
-    { number: 1, title: 'Case Details', description: 'Basic information about your case' },
-    { number: 2, title: 'Opposite Party', description: 'Information about the other party' },
-    { number: 3, title: 'Evidence & Witnesses', description: 'Upload proof and add witnesses' },
-    { number: 4, title: 'Review & Submit', description: 'Review your case before submission' }
+    { number: 1, title: 'Case Details', description: 'Basic information about your case', icon: FileText },
+    { number: 2, title: 'Opposite Party', description: 'Information about the other party', icon: Users },
+    { number: 3, title: 'Evidence & Witnesses', description: 'Upload proof and add witnesses', icon: Shield },
+    { number: 4, title: 'Review & Submit', description: 'Review your case before submission', icon: CheckCircle }
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-subtle">
-      {/* Header */}
-      <header className="bg-white border-b shadow-card">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" onClick={onBack}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
-            </Button>
-            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-              <FileText className="w-4 h-4 text-white" />
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <div className="w-72 bg-white shadow-xl border-r border-gray-200">
+        <div className="flex flex-col h-full">
+          {/* Logo Section */}
+          <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg">
+                <Scale className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">ResolveIt</h1>
+                <p className="text-xs text-gray-500">Create New Case</p>
+              </div>
             </div>
-            <h1 className="text-2xl font-bold">Create New Case</h1>
+            <CustomButton
+              variant="ghost"
+              size="sm"
+              onClick={onBack}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </CustomButton>
           </div>
-        </div>
-      </header>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Progress Steps */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between">
-            {steps.map((step, index) => (
-              <div key={step.number} className="flex items-center">
-                <div className={`flex items-center ${index !== steps.length - 1 ? 'flex-1' : ''}`}>
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+          {/* Progress Steps */}
+          <div className="flex-1 p-6">
+            <div className="space-y-6">
+              {steps.map((step, index) => (
+                <div key={step.number} className="flex items-center space-x-4">
+                  <div className={`relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 ${
                     currentStep >= step.number 
-                      ? 'bg-primary text-white' 
-                      : 'bg-muted text-muted-foreground'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg' 
+                      : 'bg-gray-200 text-gray-500'
                   }`}>
-                    {step.number}
+                    <step.icon className="w-5 h-5" />
+                    {currentStep > step.number && (
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                        <CheckCircle className="w-2 h-2 text-white" />
+                      </div>
+                    )}
                   </div>
-                  <div className="ml-3">
+                  <div className="flex-1">
                     <p className={`text-sm font-medium ${
-                      currentStep >= step.number ? 'text-foreground' : 'text-muted-foreground'
+                      currentStep >= step.number ? 'text-gray-900' : 'text-gray-500'
                     }`}>
                       {step.title}
                     </p>
-                    <p className="text-xs text-muted-foreground">{step.description}</p>
+                    <p className="text-xs text-gray-400">{step.description}</p>
                   </div>
                 </div>
-                {index !== steps.length - 1 && (
-                  <div className={`w-16 h-0.5 mx-4 ${
-                    currentStep > step.number ? 'bg-primary' : 'bg-muted'
-                  }`} />
-                )}
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="p-6 border-t border-gray-100">
+            <div className="bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200 rounded-lg p-4">
+              <h4 className="font-medium text-gray-900 mb-3 text-sm">Form Progress</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Current Step</span>
+                  <span className="font-semibold text-gray-900">{currentStep} of 4</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Files Uploaded</span>
+                  <span className="font-semibold text-blue-600">{files.length}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Witnesses Added</span>
+                  <span className="font-semibold text-green-600">{witnesses.length}</span>
+                </div>
               </div>
-            ))}
+            </div>
           </div>
         </div>
+      </div>
 
-        <form onSubmit={handleSubmit}>
-          {/* Step 1: Case Details */}
-          {currentStep === 1 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Case Details</CardTitle>
-                <CardDescription>
-                  Provide basic information about your dispute
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="caseType">Case Type *</Label>
-                  <Select value={formData.caseType} onValueChange={(value) => 
-                    setFormData(prev => ({ ...prev, caseType: value }))
-                  }>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select case type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {caseTypes.map(type => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header */}
+        <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Create New Case
+              </h1>
+              <p className="text-sm text-gray-600">
+                Step {currentStep} of 4: {steps[currentStep - 1].title}
+              </p>
+            </div>
+            
+            <div className="flex items-center space-x-3">
+              <CustomButton variant="ghost" size="sm">
+                <AlertCircle className="w-5 h-5" />
+              </CustomButton>
+            </div>
+          </div>
+        </header>
 
-                <div className="space-y-2">
-                  <Label htmlFor="title">Case Title *</Label>
-                  <Input
-                    id="title"
-                    placeholder="Brief title for your case"
-                    value={formData.title}
-                    onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Case Description *</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="Detailed description of your dispute..."
-                    rows={6}
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    required
-                  />
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="pending-court"
-                    checked={formData.isPendingInCourt}
-                    onCheckedChange={(checked) => 
-                      setFormData(prev => ({ ...prev, isPendingInCourt: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="pending-court">
-                    This case is pending in court or with police
-                  </Label>
-                </div>
-
-                {formData.isPendingInCourt && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-warning/5 border border-warning/20 rounded-lg">
-                    <div className="space-y-2">
-                      <Label htmlFor="firNumber">FIR Number (if applicable)</Label>
-                      <Input
-                        id="firNumber"
-                        placeholder="FIR-YYYY-XXXXXX"
-                        value={formData.firNumber}
-                        onChange={(e) => setFormData(prev => ({ ...prev, firNumber: e.target.value }))}
-                      />
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto p-6">
+          <form onSubmit={handleSubmit}>
+            {/* Step 1: Case Details */}
+            {currentStep === 1 && (
+              <CustomCard className="group hover:shadow-lg transition-all duration-300">
+                <CustomCardHeader>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-white" />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="courtName">Court Name (if applicable)</Label>
-                      <Input
-                        id="courtName"
-                        placeholder="Name of the court"
-                        value={formData.courtName}
-                        onChange={(e) => setFormData(prev => ({ ...prev, courtName: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Step 2: Opposite Party */}
-          {currentStep === 2 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Opposite Party Information</CardTitle>
-                <CardDescription>
-                  Details about the other party in this dispute
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="oppositePartyName">Name *</Label>
-                  <Input
-                    id="oppositePartyName"
-                    placeholder="Full name of the opposite party"
-                    value={formData.oppositePartyName}
-                    onChange={(e) => setFormData(prev => ({ ...prev, oppositePartyName: e.target.value }))}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="oppositePartyEmail">Email Address *</Label>
-                  <Input
-                    id="oppositePartyEmail"
-                    type="email"
-                    placeholder="email@example.com"
-                    value={formData.oppositePartyEmail}
-                    onChange={(e) => setFormData(prev => ({ ...prev, oppositePartyEmail: e.target.value }))}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="oppositePartyPhone">Phone Number</Label>
-                  <Input
-                    id="oppositePartyPhone"
-                    placeholder="+1-555-0123"
-                    value={formData.oppositePartyPhone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, oppositePartyPhone: e.target.value }))}
-                  />
-                </div>
-
-                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-                  <div className="flex items-start space-x-2">
-                    <AlertCircle className="w-5 h-5 text-primary mt-0.5" />
                     <div>
-                      <h4 className="font-medium text-primary">Important Notice</h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        The opposite party will be notified about this case via email once it's verified. 
-                        Please ensure the contact information is accurate.
-                      </p>
+                      <CustomCardTitle className="text-2xl font-bold text-gray-900">Case Details</CustomCardTitle>
+                      <CustomCardDescription className="text-gray-600">
+                        Provide basic information about your dispute
+                      </CustomCardDescription>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                </CustomCardHeader>
+                <CustomCardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="caseType" className="text-sm font-medium text-black">
+                        Case Type *
+                      </Label>
+                      <Select value={formData.caseType} onValueChange={(value) => 
+                        setFormData(prev => ({ ...prev, caseType: value }))
+                      }>
+                        <SelectTrigger className="h-12 bg-white border-gray-300 focus:ring-2 focus:ring-blue-500 text-black">
+                          <SelectValue placeholder="Select case type" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-gray-300 text-black">
+                          {caseTypes.map(type => (
+                            <SelectItem key={type} value={type} className="text-gray-700">
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-          {/* Step 3: Evidence & Witnesses */}
-          {currentStep === 3 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Evidence & Witnesses</CardTitle>
-                <CardDescription>
-                  Upload supporting documents and add witness information
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* File Upload */}
-                <div className="space-y-4">
-                  <Label>Supporting Documents</Label>
-                  <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center">
-                    <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Upload images, audio, video, or documents
-                    </p>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*,audio/*,video/*,.pdf,.doc,.docx"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      id="file-upload"
+                    <div className="space-y-2">
+                      <Label htmlFor="title" className="text-sm font-medium text-black">
+                        Case Title *
+                      </Label>
+                      <Input
+                        id="title"
+                        placeholder="Brief title for your case"
+                        value={formData.title}
+                        onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                        required
+                        className="h-12 bg-white border-gray-300 focus:ring-2 focus:ring-blue-500 text-black"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description" className="text-sm font-medium text-black">
+                      Case Description *
+                    </Label>
+                    <Textarea
+                      id="description"
+                      placeholder="Detailed description of your dispute..."
+                      rows={6}
+                      value={formData.description}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      required
+                      className="bg-white border-gray-300 focus:ring-2 focus:ring-blue-500 resize-none text-black"
                     />
-                    <Label htmlFor="file-upload" className="cursor-pointer">
-                      <Button type="button" variant="outline">Choose Files</Button>
+                  </div>
+
+                  <div className="flex items-center space-x-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <Checkbox
+                      id="pending-court"
+                      checked={formData.isPendingInCourt}
+                      onCheckedChange={(checked) => 
+                        setFormData(prev => ({ ...prev, isPendingInCourt: checked as boolean }))
+                      }
+                      className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                    />
+                    <Label htmlFor="pending-court" className="text-sm font-medium text-black">
+                      This case is pending in court or with police
                     </Label>
                   </div>
 
-                  {files.length > 0 && (
-                    <div className="space-y-2">
-                      {files.map(file => (
-                        <div key={file.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                          <div>
-                            <p className="font-medium text-sm">{file.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {(file.size / 1024 / 1024).toFixed(2)} MB
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeFile(file.id)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
+                  {formData.isPendingInCourt && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg">
+                      <div className="space-y-2">
+                        <Label htmlFor="firNumber" className="text-sm font-medium text-black">
+                          FIR Number (if applicable)
+                        </Label>
+                        <Input
+                          id="firNumber"
+                          placeholder="FIR-YYYY-XXXXXX"
+                          value={formData.firNumber}
+                          onChange={(e) => setFormData(prev => ({ ...prev, firNumber: e.target.value }))}
+                          className="bg-white border-gray-300 focus:ring-2 focus:ring-blue-500 text-black"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="courtName" className="text-sm font-medium text-black">
+                          Court Name (if applicable)
+                        </Label>
+                        <Input
+                          id="courtName"
+                          placeholder="Name of the court"
+                          value={formData.courtName}
+                          onChange={(e) => setFormData(prev => ({ ...prev, courtName: e.target.value }))}
+                          className="bg-white border-gray-300 focus:ring-2 focus:ring-blue-500 text-black"
+                        />
+                      </div>
                     </div>
                   )}
-                </div>
+                </CustomCardContent>
+              </CustomCard>
+            )}
 
-                {/* Witnesses */}
-                <div className="space-y-4">
-                  <Label>Witnesses (Optional)</Label>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg">
-                    <div className="space-y-2">
-                      <Label htmlFor="witnessName">Name</Label>
-                      <Input
-                        id="witnessName"
-                        placeholder="Witness name"
-                        value={newWitness.name}
-                        onChange={(e) => setNewWitness(prev => ({ ...prev, name: e.target.value }))}
-                      />
+            {/* Step 2: Opposite Party */}
+            {currentStep === 2 && (
+              <CustomCard className="group hover:shadow-lg transition-all duration-300">
+                <CustomCardHeader>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg flex items-center justify-center">
+                      <Users className="w-5 h-5 text-white" />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="witnessEmail">Email</Label>
-                      <Input
-                        id="witnessEmail"
-                        type="email"
-                        placeholder="witness@example.com"
-                        value={newWitness.email}
-                        onChange={(e) => setNewWitness(prev => ({ ...prev, email: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="witnessPhone">Phone</Label>
-                      <Input
-                        id="witnessPhone"
-                        placeholder="+1-555-0123"
-                        value={newWitness.phone}
-                        onChange={(e) => setNewWitness(prev => ({ ...prev, phone: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="witnessRelationship">Relationship</Label>
-                      <Input
-                        id="witnessRelationship"
-                        placeholder="e.g., Colleague, Neighbor"
-                        value={newWitness.relationship}
-                        onChange={(e) => setNewWitness(prev => ({ ...prev, relationship: e.target.value }))}
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Button type="button" onClick={addWitness} variant="outline" className="w-full">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Witness
-                      </Button>
+                    <div>
+                      <CustomCardTitle className="text-2xl font-bold text-gray-900">Opposite Party Information</CustomCardTitle>
+                      <CustomCardDescription className="text-gray-600">
+                        Details about the other party in this dispute
+                      </CustomCardDescription>
                     </div>
                   </div>
+                </CustomCardHeader>
+                <CustomCardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="oppositePartyName" className="text-sm font-medium text-black">
+                        Name *
+                      </Label>
+                      <Input
+                        id="oppositePartyName"
+                        placeholder="Full name of the opposite party"
+                        value={formData.oppositePartyName}
+                        onChange={(e) => setFormData(prev => ({ ...prev, oppositePartyName: e.target.value }))}
+                        required
+                        className="h-12 bg-white border-gray-300 focus:ring-2 focus:ring-blue-500 text-black"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="oppositePartyEmail" className="text-sm font-medium text-black">
+                        Email Address *
+                      </Label>
+                      <Input
+                        id="oppositePartyEmail"
+                        type="email"
+                        placeholder="email@example.com"
+                        value={formData.oppositePartyEmail}
+                        onChange={(e) => setFormData(prev => ({ ...prev, oppositePartyEmail: e.target.value }))}
+                        required
+                        className="h-12 bg-white border-gray-300 focus:ring-2 focus:ring-blue-500 text-black"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="oppositePartyPhone" className="text-sm font-medium text-black">
+                      Phone Number
+                    </Label>
+                    <Input
+                      id="oppositePartyPhone"
+                      placeholder="+1-555-0123"
+                      value={formData.oppositePartyPhone}
+                      onChange={(e) => setFormData(prev => ({ ...prev, oppositePartyPhone: e.target.value }))}
+                      className="h-12 bg-white border-gray-300 focus:ring-2 focus:ring-blue-500 text-black"
+                    />
+                  </div>
+
+                  <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start space-x-3">
+                      <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-blue-900">Important Notice</h4>
+                        <p className="text-sm text-blue-700 mt-1">
+                          The opposite party will be notified about this case via email once it's verified. 
+                          Please ensure the contact information is accurate.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CustomCardContent>
+              </CustomCard>
+            )}
+
+            {/* Step 3: Evidence & Witnesses */}
+            {currentStep === 3 && (
+              <CustomCard className="group hover:shadow-lg transition-all duration-300">
+                <CustomCardHeader>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                      <Shield className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <CustomCardTitle className="text-2xl font-bold text-gray-900">Evidence & Witnesses</CustomCardTitle>
+                      <CustomCardDescription className="text-gray-600">
+                        Upload supporting documents and add witness information
+                      </CustomCardDescription>
+                    </div>
+                  </div>
+                </CustomCardHeader>
+                <CustomCardContent className="space-y-8">
+                  {/* File Upload */}
+                  <div className="space-y-4">
+                    <Label className="text-sm font-medium text-black">
+                      Supporting Documents
+                    </Label>
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors">
+                      <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-lg font-medium text-gray-700 mb-2">
+                        Upload your evidence
+                      </p>
+                      <p className="text-sm text-gray-500 mb-4">
+                        Upload images, audio, video, or documents to support your case
+                      </p>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*,audio/*,video/*,.pdf,.doc,.docx"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                        id="file-upload"
+                      />
+                      <label htmlFor="file-upload" className="cursor-pointer">
+                        <CustomButton type="button" variant="outline" className="bg-white border-gray-300 hover:border-blue-500">
+                          <Upload className="w-4 h-4 mr-2" />
+                          Choose Files
+                        </CustomButton>
+                      </label>
+                    </div>
+
+                    {files.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="font-medium text-gray-700">Uploaded Files ({files.length})</h4>
+                        {files.map(file => (
+                          <div key={file.id} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
+                                {getFileIcon(file.type)}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900 text-sm">{file.name}</p>
+                                <p className="text-xs text-gray-500">
+                                  {(file.size / 1024 / 1024).toFixed(2)} MB
+                                </p>
+                              </div>
+                            </div>
+                            <CustomButton
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeFile(file.id)}
+                              className="text-gray-400 hover:text-red-500"
+                            >
+                              <X className="w-4 h-4" />
+                            </CustomButton>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Witnesses */}
+                  <div className="space-y-4">
+                    <Label className="text-sm font-medium text-black">
+                      Witnesses (Optional)
+                    </Label>
+                    
+                    <div className="p-6 bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200 rounded-lg">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="witnessName" className="text-sm font-medium text-black">Name</Label>
+                                                      <Input
+                              id="witnessName"
+                              placeholder="Witness name"
+                              value={newWitness.name}
+                              onChange={(e) => setNewWitness(prev => ({ ...prev, name: e.target.value }))}
+                              className="bg-white border-gray-300 focus:ring-2 focus:ring-blue-500 text-black"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="witnessEmail" className="text-sm font-medium text-black">Email</Label>
+                                                      <Input
+                              id="witnessEmail"
+                              type="email"
+                              placeholder="witness@example.com"
+                              value={newWitness.email}
+                              onChange={(e) => setNewWitness(prev => ({ ...prev, email: e.target.value }))}
+                              className="bg-white border-gray-300 focus:ring-2 focus:ring-blue-500 text-black"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="witnessPhone" className="text-sm font-medium text-black">Phone</Label>
+                                                      <Input
+                              id="witnessPhone"
+                              placeholder="+1-555-0123"
+                              value={newWitness.phone}
+                              onChange={(e) => setNewWitness(prev => ({ ...prev, phone: e.target.value }))}
+                              className="bg-white border-gray-300 focus:ring-2 focus:ring-blue-500 text-black"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="witnessRelationship" className="text-sm font-medium text-black">Relationship</Label>
+                                                      <Input
+                              id="witnessRelationship"
+                              placeholder="e.g., Colleague, Neighbor"
+                              value={newWitness.relationship}
+                              onChange={(e) => setNewWitness(prev => ({ ...prev, relationship: e.target.value }))}
+                              className="bg-white border-gray-300 focus:ring-2 focus:ring-blue-500 text-black"
+                            />
+                        </div>
+                      </div>
+                      <div className="mt-4">
+                        <CustomButton type="button" onClick={addWitness} variant="outline" className="w-full bg-white border-gray-300 hover:border-blue-500">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Witness
+                        </CustomButton>
+                      </div>
+                    </div>
+
+                    {witnesses.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="font-medium text-gray-700">Added Witnesses ({witnesses.length})</h4>
+                        {witnesses.map(witness => (
+                          <div key={witness.id} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg">
+                            <div>
+                              <p className="font-medium text-gray-900 text-sm">{witness.name}</p>
+                              <p className="text-xs text-gray-500">
+                                {witness.email} • {witness.relationship}
+                              </p>
+                            </div>
+                            <CustomButton
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeWitness(witness.id)}
+                              className="text-gray-400 hover:text-red-500"
+                            >
+                              <X className="w-4 h-4" />
+                            </CustomButton>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CustomCardContent>
+              </CustomCard>
+            )}
+
+            {/* Step 4: Review & Submit */}
+            {currentStep === 4 && (
+              <CustomCard className="group hover:shadow-lg transition-all duration-300">
+                <CustomCardHeader>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-emerald-500 to-green-600 rounded-lg flex items-center justify-center">
+                      <CheckCircle className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <CustomCardTitle className="text-2xl font-bold text-gray-900">Review Your Case</CustomCardTitle>
+                      <CustomCardDescription className="text-gray-600">
+                        Please review all information before submitting
+                      </CustomCardDescription>
+                    </div>
+                  </div>
+                </CustomCardHeader>
+                <CustomCardContent className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                      <h4 className="font-medium text-blue-900 mb-3">Case Information</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-blue-700">Type:</span>
+                          <CustomBadge variant="outline" className="bg-white border-blue-300 text-blue-700">
+                            {formData.caseType}
+                          </CustomBadge>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-blue-700">Title:</span>
+                          <span className="text-right text-gray-900 font-medium">{formData.title}</span>
+                        </div>
+                        {formData.isPendingInCourt && (
+                          <div className="flex justify-between">
+                            <span className="text-blue-700">Status:</span>
+                            <CustomBadge variant="secondary" className="bg-amber-100 text-amber-700">
+                              Pending in Court
+                            </CustomBadge>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg">
+                      <h4 className="font-medium text-purple-900 mb-3">Opposite Party</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-purple-700">Name:</span>
+                          <span className="text-gray-900 font-medium">{formData.oppositePartyName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-purple-700">Email:</span>
+                          <span className="text-gray-900">{formData.oppositePartyEmail}</span>
+                        </div>
+                        {formData.oppositePartyPhone && (
+                          <div className="flex justify-between">
+                            <span className="text-purple-700">Phone:</span>
+                            <span className="text-gray-900">{formData.oppositePartyPhone}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-gradient-to-r from-gray-50 to-gray-50 border border-gray-200 rounded-lg">
+                    <h4 className="font-medium text-gray-900 mb-3">Description</h4>
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      {formData.description}
+                    </p>
+                  </div>
+
+                  {files.length > 0 && (
+                    <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
+                      <h4 className="font-medium text-green-900 mb-3">Uploaded Files ({files.length})</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {files.map(file => (
+                          <div key={file.id} className="p-2 bg-white rounded text-xs text-center border border-green-200">
+                            {file.name}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {witnesses.length > 0 && (
-                    <div className="space-y-2">
-                      {witnesses.map(witness => (
-                        <div key={witness.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                          <div>
-                            <p className="font-medium text-sm">{witness.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {witness.email} • {witness.relationship}
-                            </p>
+                    <div className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-lg">
+                      <h4 className="font-medium text-orange-900 mb-3">Witnesses ({witnesses.length})</h4>
+                      <div className="space-y-2">
+                        {witnesses.map(witness => (
+                          <div key={witness.id} className="text-sm p-2 bg-white rounded border border-orange-200">
+                            {witness.name} - {witness.relationship}
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeWitness(witness.id)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
-          {/* Step 4: Review & Submit */}
-          {currentStep === 4 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Review Your Case</CardTitle>
-                <CardDescription>
-                  Please review all information before submitting
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="font-medium mb-2">Case Information</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Type:</span>
-                        <Badge variant="outline">{formData.caseType}</Badge>
+                  <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start space-x-3">
+                      <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-blue-900">Next Steps</h4>
+                        <p className="text-sm text-blue-700 mt-1">
+                          After submission, your case will be reviewed and verified. 
+                          You'll receive updates via email and can track progress in your dashboard.
+                        </p>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Title:</span>
-                        <span className="text-right">{formData.title}</span>
-                      </div>
-                      {formData.isPendingInCourt && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Status:</span>
-                          <Badge variant="secondary">Pending in Court</Badge>
-                        </div>
-                      )}
                     </div>
                   </div>
+                </CustomCardContent>
+              </CustomCard>
+            )}
 
-                  <div>
-                    <h4 className="font-medium mb-2">Opposite Party</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Name:</span>
-                        <span>{formData.oppositePartyName}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Email:</span>
-                        <span>{formData.oppositePartyEmail}</span>
-                      </div>
-                      {formData.oppositePartyPhone && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Phone:</span>
-                          <span>{formData.oppositePartyPhone}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+            {/* Navigation Buttons */}
+            <div className="flex justify-between mt-8">
+              <CustomButton
+                type="button"
+                variant="outline"
+                onClick={handlePrevious}
+                disabled={currentStep === 1}
+                className="border-gray-300 bg-white text-gray-700 hover:border-blue-500"
+              >
+                Previous
+              </CustomButton>
 
-                <div>
-                  <h4 className="font-medium mb-2">Description</h4>
-                  <p className="text-sm text-muted-foreground bg-muted p-3 rounded-lg">
-                    {formData.description}
-                  </p>
-                </div>
-
-                {files.length > 0 && (
-                  <div>
-                    <h4 className="font-medium mb-2">Uploaded Files ({files.length})</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      {files.map(file => (
-                        <div key={file.id} className="p-2 bg-muted rounded text-xs text-center">
-                          {file.name}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+              <div className="flex space-x-4">
+                {currentStep < 4 ? (
+                  <CustomButton
+                    type="button"
+                    onClick={handleNext}
+                    disabled={
+                      (currentStep === 1 && (!formData.caseType || !formData.title || !formData.description)) ||
+                      (currentStep === 2 && (!formData.oppositePartyName || !formData.oppositePartyEmail))
+                    }
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                  >
+                    Next
+                  </CustomButton>
+                ) : (
+                  <CustomButton 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Submit Case
+                      </>
+                    )}
+                  </CustomButton>
                 )}
-
-                {witnesses.length > 0 && (
-                  <div>
-                    <h4 className="font-medium mb-2">Witnesses ({witnesses.length})</h4>
-                    <div className="space-y-2">
-                      {witnesses.map(witness => (
-                        <div key={witness.id} className="text-sm p-2 bg-muted rounded">
-                          {witness.name} - {witness.relationship}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-                  <div className="flex items-start space-x-2">
-                    <AlertCircle className="w-5 h-5 text-primary mt-0.5" />
-                    <div>
-                      <h4 className="font-medium text-primary">Next Steps</h4>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        After submission, your case will be reviewed and verified. 
-                        You'll receive updates via email and can track progress in your dashboard.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Navigation Buttons */}
-          <div className="flex justify-between mt-8">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handlePrevious}
-              disabled={currentStep === 1}
-            >
-              Previous
-            </Button>
-
-            <div className="flex space-x-4">
-              {currentStep < 4 ? (
-                <Button
-                  type="button"
-                  onClick={handleNext}
-                  disabled={
-                    (currentStep === 1 && (!formData.caseType || !formData.title || !formData.description)) ||
-                    (currentStep === 2 && (!formData.oppositePartyName || !formData.oppositePartyEmail))
-                  }
-                >
-                  Next
-                </Button>
-              ) : (
-                <Button 
-                  type="submit" 
-                  variant="professional"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : (
-                    'Submit Case'
-                  )}
-                </Button>
-              )}
+              </div>
             </div>
-          </div>
-        </form>
+          </form>
+        </main>
       </div>
     </div>
   );
