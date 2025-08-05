@@ -432,6 +432,7 @@ export const adminApi = {
 
   // Assign panel to case
   assignPanel: async (caseId: string, members: Omit<PanelMember, '_id'>[]): Promise<ApiResponse<{ case: Case }>> => {
+    console.log('Sending panel assignment request:', { caseId, members });
     return await apiRequest<{ case: Case }>(`/cases/${caseId}/panel`, {
       method: 'POST',
       body: JSON.stringify({ members }),

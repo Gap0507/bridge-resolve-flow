@@ -4,6 +4,7 @@ import { body, validationResult } from 'express-validator';
 export const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    console.log('Validation errors:', errors.array());
     return res.status(400).json({
       success: false,
       message: 'Validation failed',
@@ -53,7 +54,7 @@ export const validateUserRegistration = [
   
   body('phone')
     .optional()
-    .matches(/^[\+]?[1-9][\d]{0,15}$/)
+    .matches(/^[\+]?[0-9\s\-\(\)]{10,15}$/)
     .withMessage('Please provide a valid phone number'),
   
   body('password')
@@ -116,7 +117,7 @@ export const validateCaseCreation = [
     .withMessage('Please provide a valid email address for opposite party'),
   
   body('oppositePartyPhone')
-    .matches(/^[\+]?[1-9][\d]{0,15}$/)
+    .matches(/^[\+]?[0-9\s\-\(\)]{10,15}$/)
     .withMessage('Please provide a valid phone number for opposite party'),
   
   body('isPendingInCourt')
@@ -183,7 +184,7 @@ export const validateWitness = [
     .withMessage('Please provide a valid email address for witness'),
   
   body('phone')
-    .matches(/^[\+]?[1-9][\d]{0,15}$/)
+    .matches(/^[\+]?[0-9\s\-\(\)]{10,15}$/)
     .withMessage('Please provide a valid phone number for witness'),
   
   body('relationship')
@@ -194,7 +195,7 @@ export const validateWitness = [
   handleValidationErrors
 ];
 
-// Panel member validation
+// Panel member validation (for single member)
 export const validatePanelMember = [
   body('name')
     .trim()
@@ -211,8 +212,64 @@ export const validatePanelMember = [
     .withMessage('Please provide a valid email address for panel member'),
   
   body('phone')
-    .matches(/^[\+]?[1-9][\d]{0,15}$/)
+    .matches(/^[\+]?[0-9\s\-\(\)]{10,15}$/)
     .withMessage('Please provide a valid phone number for panel member'),
+  
+  handleValidationErrors
+];
+
+// Panel assignment validation (for array of members)
+export const validatePanelAssignment = [
+  body('members')
+    .isArray({ min: 3, max: 3 })
+    .withMessage('Panel must have exactly 3 members'),
+  
+  body('members.*.name')
+    .trim()
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Panel member name must be between 2 and 100 characters'),
+  
+  body('members.*.role')
+    .isIn(['Lawyer', 'Religious Leader', 'Community Representative'])
+    .withMessage('Invalid panel member role'),
+  
+  body('members.*.email')
+    .optional()
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Please provide a valid email address for panel member'),
+  
+  body('members.*.phone')
+    .optional()
+    .matches(/^[\+]?[0-9\s\-\(\)]{10,15}$/)
+    .withMessage('Please provide a valid phone number for panel member'),
+  
+  // Custom validation to ensure at least one field is filled per member
+  (req, res, next) => {
+    const { members } = req.body;
+    
+    if (members && Array.isArray(members)) {
+      for (let i = 0; i < members.length; i++) {
+        const member = members[i];
+        const hasName = member.name && member.name.trim().length > 0;
+        const hasEmail = member.email && member.email.trim().length > 0;
+        const hasPhone = member.phone && member.phone.trim().length > 0;
+        
+        if (!hasName && !hasEmail && !hasPhone) {
+          return res.status(400).json({
+            success: false,
+            message: 'Validation failed',
+            errors: [{
+              field: `members[${i}]`,
+              message: 'At least one field (name, email, or phone) must be provided for each panel member'
+            }]
+          });
+        }
+      }
+    }
+    
+    next();
+  },
   
   handleValidationErrors
 ];

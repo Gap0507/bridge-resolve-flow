@@ -442,6 +442,11 @@ export const removeWitness = async (req, res) => {
 export const assignPanel = async (req, res) => {
   try {
     const { members } = req.body;
+    
+    console.log('Received panel assignment request:', {
+      caseId: req.params.id,
+      members: members
+    });
 
     const case_ = await Case.findById(req.params.id);
 
@@ -470,6 +475,21 @@ export const assignPanel = async (req, res) => {
         success: false,
         message: 'Panel must include a Lawyer, Religious Leader, and Community Representative'
       });
+    }
+
+    // Validate that each member has at least one field filled
+    for (let i = 0; i < members.length; i++) {
+      const member = members[i];
+      const hasName = member.name && member.name.trim().length > 0;
+      const hasEmail = member.email && member.email.trim().length > 0;
+      const hasPhone = member.phone && member.phone.trim().length > 0;
+      
+      if (!hasName && !hasEmail && !hasPhone) {
+        return res.status(400).json({
+          success: false,
+          message: `Panel member ${i + 1} must have at least one field (name, email, or phone) filled`
+        });
+      }
     }
 
     // Assign panel

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { casesApi, authApi, type Case, type User } from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
 import { 
   Plus, 
   FileText, 
@@ -41,13 +42,22 @@ import {
   Clock3,
   Scale,
   Menu,
-  X
+  X,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Upload,
+  UserPlus,
+  UserMinus,
+  Download,
+  Info
 } from 'lucide-react';
 
 // Types
 interface UserDashboardProps {
   onCreateCase: () => void;
   onViewCase: (caseId: string) => void;
+  onEditCase?: (caseId: string) => void;
 }
 
 const statusConfig = {
@@ -182,12 +192,18 @@ const AvatarFallback = ({ children, className }: any) => (
   </div>
 );
 
-export function UserDashboard({ onCreateCase = () => {}, onViewCase = () => {} }: UserDashboardProps) {
+export function UserDashboard({ onCreateCase = () => {}, onViewCase = () => {}, onEditCase = () => {} }: UserDashboardProps) {
   const { user, logout } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentView, setCurrentView] = useState<DashboardView>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // State for user actions
+  const [selectedCase, setSelectedCase] = useState<Case | null>(null);
+  const [showActionMenu, setShowActionMenu] = useState<string | null>(null);
+  const [isDeletingCase, setIsDeletingCase] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Fetch user cases using React Query
   const { 
@@ -210,6 +226,35 @@ export function UserDashboard({ onCreateCase = () => {}, onViewCase = () => {} }
   const cases = casesData?.cases || [];
   const isLoading = casesLoading;
   const error = casesError?.message || '';
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Mutations for user actions
+  const deleteCaseMutation = useMutation({
+    mutationFn: async (caseId: string) => {
+      const response = await casesApi.deleteCase(caseId);
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to delete case');
+      }
+      return response;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Case deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['userCases'] });
+      setShowDeleteConfirm(false);
+      setSelectedCase(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete case",
+        variant: "destructive",
+      });
+    },
+  });
 
   const getStatusBadge = (status: Case['status']) => {
     const config = statusConfig[status];
@@ -252,6 +297,71 @@ export function UserDashboard({ onCreateCase = () => {}, onViewCase = () => {} }
   const handleLogout = () => {
     logout();
   };
+
+  // Helper functions for user actions
+  const handleDeleteCase = (case_: Case) => {
+    if (case_.status !== 'Pending Verification') {
+      toast({
+        title: "Cannot Delete",
+        description: "Only cases with 'Pending Verification' status can be deleted",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSelectedCase(case_);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteCase = () => {
+    if (selectedCase) {
+      deleteCaseMutation.mutate(selectedCase._id);
+    }
+  };
+
+  const handleEditCase = (caseId: string) => {
+    if (onEditCase) {
+      onEditCase(caseId);
+    } else {
+      onViewCase(caseId);
+    }
+  };
+
+  const canDeleteCase = (case_: Case) => {
+    return case_.status === 'Pending Verification';
+  };
+
+  const canEditCase = (case_: Case) => {
+    // Users can edit cases that are still in initial stages
+    return ['Pending Verification', 'Verified', 'Awaiting Response'].includes(case_.status);
+  };
+
+  // Close action menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showActionMenu && !(event.target as Element).closest('.action-menu')) {
+        setShowActionMenu(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showActionMenu]);
+
+  // Close action menu when pressing Escape
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowActionMenu(null);
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
 
   if (isLoading) {
     return (
@@ -480,6 +590,33 @@ export function UserDashboard({ onCreateCase = () => {}, onViewCase = () => {} }
                 </Card>
               </div>
 
+              {/* User Actions Info */}
+              <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+                <CardContent className="p-6">
+                  <div className="flex items-start space-x-4">
+                    <div className="w-12 h-12 flex items-center justify-center">
+                      <Info className="w-6 h-6 text-blue-600 mt-8" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-blue-900 mt-4">Your Case Management</h4>
+                      <p className="text-sm text-blue-700 mb-3 mt-4">
+                        You can edit cases that are in early stages and delete cases that haven't been processed yet.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <span className="text-blue-700">Edit: Pending, Verified, Awaiting Response</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                          <span className="text-blue-700">Delete: Pending Verification only</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Recent Activity & Active Cases */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Recent Activity */}
@@ -650,15 +787,72 @@ export function UserDashboard({ onCreateCase = () => {}, onViewCase = () => {} }
                               </Badge>
                               {getStatusBadge(case_.status)}
                             </div>
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => onViewCase(case_._id)}
-                              className="group-hover:border-blue-500 group-hover:text-blue-600 transition-all duration-200"
-                            >
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Details
-                            </Button>
+                            <div className="flex items-center space-x-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => onViewCase(case_._id)}
+                                className="group-hover:border-blue-500 group-hover:text-blue-600 transition-all duration-200"
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                View
+                              </Button>
+                              
+                              {/* Action Menu */}
+                              <div className="relative action-menu">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setShowActionMenu(showActionMenu === case_._id ? null : case_._id)}
+                                  className="p-2"
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                                
+                                {showActionMenu === case_._id && (
+                                  <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10 action-menu">
+                                    <div className="py-1">
+                                      {canEditCase(case_) && (
+                                        <button
+                                          onClick={() => {
+                                            handleEditCase(case_._id);
+                                            setShowActionMenu(null);
+                                          }}
+                                          className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                        >
+                                          <Edit className="w-4 h-4 mr-2" />
+                                          Edit Case
+                                        </button>
+                                      )}
+                                      
+                                      <button
+                                        onClick={() => {
+                                          onViewCase(case_._id);
+                                          setShowActionMenu(null);
+                                        }}
+                                        className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                      >
+                                        <FileText className="w-4 h-4 mr-2" />
+                                        View Details
+                                      </button>
+                                      
+                                      {canDeleteCase(case_) && (
+                                        <button
+                                          onClick={() => {
+                                            handleDeleteCase(case_);
+                                            setShowActionMenu(null);
+                                          }}
+                                          className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center"
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-2" />
+                                          Delete Case
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
                           
                           <h4 className="font-bold text-xl mb-3 text-gray-900 group-hover:text-blue-600 transition-colors">
@@ -672,12 +866,24 @@ export function UserDashboard({ onCreateCase = () => {}, onViewCase = () => {} }
                             <div className="flex items-center text-sm text-gray-500">
                               <span className="font-medium text-gray-700">vs. {case_.oppositePartyName}</span>
                             </div>
-                            <div className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
-                              📅 {new Date(case_.createdAt).toLocaleDateString('en-US', { 
-                                month: 'short', 
-                                day: 'numeric', 
-                                year: 'numeric' 
-                              })}
+                            <div className="flex items-center space-x-2">
+                              <div className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
+                                📅 {new Date(case_.createdAt).toLocaleDateString('en-US', { 
+                                  month: 'short', 
+                                  day: 'numeric', 
+                                  year: 'numeric' 
+                                })}
+                              </div>
+                              {canEditCase(case_) && (
+                                <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                                  ✏️ Editable
+                                </div>
+                              )}
+                              {canDeleteCase(case_) && (
+                                <div className="text-xs text-red-600 bg-red-50 px-2 py-1 rounded-full">
+                                  🗑️ Deletable
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -795,6 +1001,59 @@ export function UserDashboard({ onCreateCase = () => {}, onViewCase = () => {} }
           )}
         </main>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && selectedCase && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Delete Case</h3>
+                <p className="text-sm text-gray-600">This action cannot be undone</p>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-700 mb-2">
+                Are you sure you want to delete the case:
+              </p>
+              <p className="font-semibold text-gray-900">{selectedCase.title}</p>
+              <p className="text-sm text-gray-500 mt-1">
+                Case ID: {selectedCase._id}
+              </p>
+            </div>
+            
+            <div className="flex space-x-3">
+              <Button
+                onClick={confirmDeleteCase}
+                disabled={deleteCaseMutation.isPending}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              >
+                {deleteCaseMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4 mr-2" />
+                )}
+                {deleteCaseMutation.isPending ? 'Deleting...' : 'Delete Case'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setSelectedCase(null);
+                }}
+                disabled={deleteCaseMutation.isPending}
+                className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sidebar Overlay for Mobile */}
       {sidebarOpen && (

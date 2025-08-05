@@ -5,8 +5,9 @@ import { UserDashboard } from '@/components/Dashboard/UserDashboard';
 import { AdminDashboard } from '@/components/Admin/AdminDashboard';
 import { CreateCaseForm } from '@/components/Case/CreateCaseForm';
 import { CaseDetails } from '@/components/Case/CaseDetails';
+import { EditCaseForm } from '@/components/Case/EditCaseForm';
 
-type AppView = 'login' | 'dashboard' | 'create-case' | 'case-details';
+type AppView = 'login' | 'dashboard' | 'create-case' | 'case-details' | 'edit-case';
 
 function AppContent() {
   const { user, isLoading } = useAuth();
@@ -39,6 +40,11 @@ function AppContent() {
     setCurrentView('case-details');
   };
 
+  const handleEditCase = (caseId: string) => {
+    setSelectedCaseId(caseId);
+    setCurrentView('edit-case');
+  };
+
   const handleBackToDashboard = () => {
     setCurrentView('dashboard');
     setSelectedCaseId(null);
@@ -65,6 +71,15 @@ function AppContent() {
         />
       ) : null;
     
+    case 'edit-case':
+      return selectedCaseId ? (
+        <EditCaseForm 
+          caseId={selectedCaseId}
+          onBack={handleBackToDashboard}
+          onSubmit={handleBackToDashboard}
+        />
+      ) : null;
+    
     case 'dashboard':
     default:
       return user.role === 'admin' ? (
@@ -73,6 +88,7 @@ function AppContent() {
         <UserDashboard 
           onCreateCase={handleCreateCase}
           onViewCase={handleViewCase}
+          onEditCase={handleEditCase}
         />
       );
   }

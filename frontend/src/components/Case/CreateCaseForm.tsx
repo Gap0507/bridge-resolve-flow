@@ -547,19 +547,6 @@ export function CreateCaseForm({ onBack, onSubmit }: CreateCaseFormProps) {
                       className="h-12 bg-white border-gray-300 focus:ring-2 focus:ring-blue-500 text-black"
                     />
                   </div>
-
-                  <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-start space-x-3">
-                      <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
-                      <div>
-                        <h4 className="font-medium text-blue-900">Important Notice</h4>
-                        <p className="text-sm text-blue-700 mt-1">
-                          The opposite party will be notified about this case via email once it's verified. 
-                          Please ensure the contact information is accurate.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                 </CustomCardContent>
               </CustomCard>
             )}
@@ -602,12 +589,15 @@ export function CreateCaseForm({ onBack, onSubmit }: CreateCaseFormProps) {
                         className="hidden"
                         id="file-upload"
                       />
-                      <label htmlFor="file-upload" className="cursor-pointer">
-                        <CustomButton type="button" variant="outline" className="bg-white border-gray-300 hover:border-blue-500">
-                          <Upload className="w-4 h-4 mr-2" />
-                          Choose Files
-                        </CustomButton>
-                      </label>
+                      <CustomButton 
+                        type="button" 
+                        variant="outline" 
+                        className="bg-white border-gray-300 hover:border-blue-500"
+                        onClick={() => document.getElementById('file-upload')?.click()}
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Choose Files
+                      </CustomButton>
                     </div>
 
                     {files.length > 0 && (

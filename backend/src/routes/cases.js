@@ -16,6 +16,7 @@ import {
   validateCaseUpdate,
   validateWitness,
   validatePanelMember,
+  validatePanelAssignment,
   sanitizeInput
 } from '../middleware/validation.js';
 import { authenticate, authorizeUser, authorizeAdmin } from '../middleware/auth.js';
@@ -42,6 +43,6 @@ router.delete('/:id/witnesses/:witnessId', removeWitness);
 
 // Admin-only routes
 router.put('/:id/status', authorizeAdmin, sanitizeInput, validateCaseUpdate, updateCaseStatus);
-router.post('/:id/panel', authorizeAdmin, sanitizeInput, validatePanelMember, assignPanel);
+router.post('/:id/panel', authorizeAdmin, sanitizeInput, validatePanelAssignment, assignPanel);
 
 export default router; 

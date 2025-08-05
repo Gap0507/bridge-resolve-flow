@@ -42,7 +42,7 @@ const witnessSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Witness phone is required'],
     trim: true,
-    match: [/^[\+]?[1-9][\d]{0,15}$/, 'Please enter a valid phone number']
+    match: [/^[\+]?[0-9\s\-\(\)]{10,15}$/, 'Please enter a valid phone number']
   },
   relationship: {
     type: String,
@@ -71,7 +71,8 @@ const panelMemberSchema = new mongoose.Schema({
   phone: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
+    match: [/^[\+]?[0-9\s\-\(\)]{10,15}$/, 'Please enter a valid phone number']
   }
 });
 
@@ -158,7 +159,7 @@ const caseSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Opposite party phone is required'],
     trim: true,
-    match: [/^[\+]?[1-9][\d]{0,15}$/, 'Please enter a valid phone number']
+    match: [/^[\+]?[0-9\s\-\(\)]{10,15}$/, 'Please enter a valid phone number']
   },
   oppositePartyAddress: {
     street: String,
@@ -243,7 +244,7 @@ caseSchema.methods.addTimelineEvent = function(title, description, status, creat
     status,
     createdBy
   });
-  return this.save();
+  // Don't save here, let the calling method handle it
 };
 
 // Update status method

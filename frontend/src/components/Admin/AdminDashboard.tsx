@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { adminApi, Case, DashboardStats } from '@/services/api';
+import { adminApi, casesApi, Case, DashboardStats } from '@/services/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,7 +42,10 @@ import {
   UserCheck,
   FileCheck,
   CalendarDays,
-  Clock3
+  Clock3,
+  Save,
+  UserPlus,
+  Gavel
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -145,9 +148,9 @@ const CustomBadge = ({ children, className, variant }: any) => (
 const CustomButton = ({ children, className, variant = 'default', size = 'default', onClick, ...props }: any) => {
   const baseClass = "inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none";
   const variants = {
-    default: "bg-primary text-primary-foreground hover:bg-primary/90 bg-blue-600 hover:bg-blue-700 text-white",
-    outline: "border border-input hover:bg-accent hover:text-accent-foreground border-gray-300 hover:bg-gray-50",
-    ghost: "hover:bg-accent hover:text-accent-foreground hover:bg-gray-100"
+    default: "bg-blue-600 hover:bg-blue-700 text-white hover:text-white",
+    outline: "border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:text-gray-900",
+    ghost: "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
   };
   const sizes = {
     default: "h-10 py-2 px-4",
@@ -182,6 +185,33 @@ export function AdminDashboard({ onViewCase }: AdminDashboardProps) {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentView, setCurrentView] = useState<DashboardView>('overview');
+  
+  // New state for admin actions
+  const [selectedCases, setSelectedCases] = useState<string[]>([]);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusUpdateData, setStatusUpdateData] = useState<{
+    caseId: string;
+    status: Case['status'];
+    resolutionDetails?: string;
+  } | null>(null);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showPanelModal, setShowPanelModal] = useState(false);
+  const [panelData, setPanelData] = useState<{
+    caseId: string;
+    members: Array<{
+      name: string;
+      role: 'Lawyer' | 'Religious Leader' | 'Community Representative';
+      email: string;
+      phone: string;
+    }>;
+  }>({
+    caseId: '',
+    members: [
+      { name: '', role: 'Lawyer', email: '', phone: '' },
+      { name: '', role: 'Religious Leader', email: '', phone: '' },
+      { name: '', role: 'Community Representative', email: '', phone: '' }
+    ]
+  });
 
   useEffect(() => {
     loadDashboardData();
@@ -224,6 +254,190 @@ export function AdminDashboard({ onViewCase }: AdminDashboardProps) {
     
     return matchesSearch && matchesStatus && matchesType;
   });
+
+  // Handle case selection for bulk actions
+  const handleCaseSelection = (caseId: string) => {
+    setSelectedCases(prev => 
+      prev.includes(caseId) 
+        ? prev.filter(id => id !== caseId)
+        : [...prev, caseId]
+    );
+  };
+
+  const handleSelectAllCases = () => {
+    if (selectedCases.length === filteredCases.length) {
+      setSelectedCases([]);
+    } else {
+      setSelectedCases(filteredCases.map(c => c._id));
+    }
+  };
+
+  // Update case status with debouncing
+  const [updatingCases, setUpdatingCases] = useState<Set<string>>(new Set());
+  
+  const handleUpdateCaseStatus = async (caseId: string, status: Case['status'], resolutionDetails?: string) => {
+    // Prevent duplicate requests for the same case
+    if (updatingCases.has(caseId)) {
+      return;
+    }
+    
+    try {
+      setUpdatingCases(prev => new Set(prev).add(caseId));
+      setIsUpdatingStatus(true);
+      
+      const response = await adminApi.updateCaseStatus(caseId, status, resolutionDetails);
+      
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Case status updated successfully",
+        });
+        
+        // Refresh cases data
+        await loadDashboardData();
+        setShowStatusModal(false);
+        setStatusUpdateData(null);
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to update case status",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update case status",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingStatus(false);
+      setUpdatingCases(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(caseId);
+        return newSet;
+      });
+    }
+  };
+
+  // Assign panel to case
+  const handleAssignPanel = async (caseId: string, members: Array<{
+    name: string;
+    role: 'Lawyer' | 'Religious Leader' | 'Community Representative';
+    email: string;
+    phone: string;
+  }>) => {
+    try {
+      // Validate that at least one field is filled per member
+      const validMembers = members.filter(member => {
+        const hasName = member.name && member.name.trim().length > 0;
+        const hasEmail = member.email && member.email.trim().length > 0;
+        const hasPhone = member.phone && member.phone.trim().length > 0;
+        return hasName || hasEmail || hasPhone;
+      });
+      
+      if (validMembers.length < 3) {
+        toast({
+          title: "Validation Error",
+          description: "Please fill in at least one field (name, email, or phone) for all 3 panel members",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check if we have at least one of each required role
+      const roles = validMembers.map(m => m.role);
+      if (!roles.includes('Lawyer') || !roles.includes('Religious Leader') || !roles.includes('Community Representative')) {
+        toast({
+          title: "Validation Error",
+          description: "Panel must include one Lawyer, one Religious Leader, and one Community Representative",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await adminApi.assignPanel(caseId, validMembers);
+      
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: "Panel assigned successfully",
+        });
+        
+        // Refresh cases data
+        await loadDashboardData();
+        setShowPanelModal(false);
+        setPanelData({
+          caseId: '',
+          members: [
+            { name: '', role: 'Lawyer', email: '', phone: '' },
+            { name: '', role: 'Religious Leader', email: '', phone: '' },
+            { name: '', role: 'Community Representative', email: '', phone: '' }
+          ]
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to assign panel",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error('Panel assignment error:', error);
+      let errorMessage = "Failed to assign panel";
+      
+      if (error.message && error.message.includes('Validation failed')) {
+        errorMessage = "Please check that all panel member information is valid (name, email, phone)";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Bulk update case statuses
+  const handleBulkUpdateStatus = async (status: Case['status'], resolutionDetails?: string) => {
+    if (selectedCases.length === 0) {
+      toast({
+        title: "Warning",
+        description: "Please select cases to update",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await adminApi.bulkUpdateCaseStatus(selectedCases, status, resolutionDetails);
+      
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: `Updated ${response.data?.modifiedCount || 0} cases successfully`,
+        });
+        
+        // Refresh cases data
+        await loadDashboardData();
+        setSelectedCases([]);
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to update cases",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update cases",
+        variant: "destructive",
+      });
+    }
+  };
 
   const getStatusBadge = (status: Case['status']) => {
     const config = statusConfig[status];
@@ -497,15 +711,57 @@ export function AdminDashboard({ onViewCase }: AdminDashboardProps) {
                     <CustomCardDescription className="text-gray-600">Common administrative tasks</CustomCardDescription>
                   </CustomCardHeader>
                   <CustomCardContent className="space-y-3">
-                    <CustomButton variant="outline" className="w-full justify-start bg-transparent border-gray-300 text-gray-700 hover:bg-gray-50">
+                    <CustomButton 
+                      variant="outline" 
+                      className="w-full justify-start bg-transparent border-gray-300 text-gray-700 hover:bg-gray-50"
+                      onClick={() => {
+                        setSelectedCases(casesByStatus['Pending Verification'].map(c => c._id));
+                        setCurrentView('cases');
+                        setStatusFilter('Pending Verification');
+                      }}
+                    >
                       <CheckCircle className="w-4 h-4 mr-2" />
                       Verify Pending Cases ({casesByStatus['Pending Verification'].length})
                     </CustomButton>
-                    <CustomButton variant="outline" className="w-full justify-start bg-transparent border-gray-300 text-gray-700 hover:bg-gray-50">
+                    <CustomButton 
+                      variant="outline" 
+                      className="w-full justify-start bg-transparent border-gray-300 text-gray-700 hover:bg-gray-50"
+                      onClick={() => {
+                        const pendingCases = cases.filter(c => c.status === 'Pending Verification');
+                        if (pendingCases.length > 0) {
+                          setSelectedCases([pendingCases[0]._id]);
+                          setPanelData({
+                            caseId: pendingCases[0]._id,
+                            members: [
+                              { name: '', role: 'Lawyer', email: '', phone: '' },
+                              { name: '', role: 'Religious Leader', email: '', phone: '' },
+                              { name: '', role: 'Community Representative', email: '', phone: '' }
+                            ]
+                          });
+                          setShowPanelModal(true);
+                        } else {
+                          toast({
+                            title: "No Cases Available",
+                            description: "No pending cases available for panel assignment",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    >
                       <Users className="w-4 h-4 mr-2" />
                       Assign Mediation Panels
                     </CustomButton>
-                    <CustomButton variant="outline" className="w-full justify-start bg-transparent border-gray-300 text-gray-700 hover:bg-gray-50">
+                    <CustomButton 
+                      variant="outline" 
+                      className="w-full justify-start bg-transparent border-gray-300 text-gray-700 hover:bg-gray-50"
+                      onClick={() => {
+                        setCurrentView('analytics');
+                        toast({
+                          title: "Reports Generated",
+                          description: "Analytics and reports are now available in the Analytics tab",
+                        });
+                      }}
+                    >
                       <BarChart3 className="w-4 h-4 mr-2" />
                       Generate Reports
                     </CustomButton>
@@ -585,35 +841,35 @@ export function AdminDashboard({ onViewCase }: AdminDashboardProps) {
                       </div>
                       
                       <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-full sm:w-40 bg-white border-gray-300">
-                          <SelectValue placeholder="Filter by status" />
+                        <SelectTrigger className="w-full sm:w-40 bg-white border-gray-300 text-gray-900">
+                          <SelectValue placeholder="All Statuses" />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Statuses</SelectItem>
-                          <SelectItem value="Pending Verification">Pending Verification</SelectItem>
-                          <SelectItem value="Verified">Verified</SelectItem>
-                          <SelectItem value="Awaiting Response">Awaiting Response</SelectItem>
-                          <SelectItem value="Accepted">Accepted</SelectItem>
-                          <SelectItem value="Rejected">Rejected</SelectItem>
-                          <SelectItem value="Panel Created">Panel Created</SelectItem>
-                          <SelectItem value="Mediation in Progress">Mediation in Progress</SelectItem>
-                          <SelectItem value="Resolved">Resolved</SelectItem>
-                          <SelectItem value="Unresolved">Unresolved</SelectItem>
+                        <SelectContent className="bg-white border-gray-200">
+                          <SelectItem value="all" className="text-gray-900">All Statuses</SelectItem>
+                          <SelectItem value="Pending Verification" className="text-gray-900">Pending Verification</SelectItem>
+                          <SelectItem value="Verified" className="text-gray-900">Verified</SelectItem>
+                          <SelectItem value="Awaiting Response" className="text-gray-900">Awaiting Response</SelectItem>
+                          <SelectItem value="Accepted" className="text-gray-900">Accepted</SelectItem>
+                          <SelectItem value="Rejected" className="text-gray-900">Rejected</SelectItem>
+                          <SelectItem value="Panel Created" className="text-gray-900">Panel Created</SelectItem>
+                          <SelectItem value="Mediation in Progress" className="text-gray-900">Mediation in Progress</SelectItem>
+                          <SelectItem value="Resolved" className="text-gray-900">Resolved</SelectItem>
+                          <SelectItem value="Unresolved" className="text-gray-900">Unresolved</SelectItem>
                         </SelectContent>
                       </Select>
                       
                       <Select value={typeFilter} onValueChange={setTypeFilter}>
-                        <SelectTrigger className="w-full sm:w-32 bg-white border-gray-300">
-                          <SelectValue placeholder="Filter by type" />
+                        <SelectTrigger className="w-full sm:w-32 bg-white border-gray-300 text-gray-900">
+                          <SelectValue placeholder="All Types" />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Types</SelectItem>
-                          <SelectItem value="Family">Family</SelectItem>
-                          <SelectItem value="Business">Business</SelectItem>
-                          <SelectItem value="Criminal">Criminal</SelectItem>
-                          <SelectItem value="Property">Property</SelectItem>
-                          <SelectItem value="Employment">Employment</SelectItem>
-                          <SelectItem value="Other">Other</SelectItem>
+                        <SelectContent className="bg-white border-gray-200">
+                          <SelectItem value="all" className="text-gray-900">All Types</SelectItem>
+                          <SelectItem value="Family" className="text-gray-900">Family</SelectItem>
+                          <SelectItem value="Business" className="text-gray-900">Business</SelectItem>
+                          <SelectItem value="Criminal" className="text-gray-900">Criminal</SelectItem>
+                          <SelectItem value="Property" className="text-gray-900">Property</SelectItem>
+                          <SelectItem value="Employment" className="text-gray-900">Employment</SelectItem>
+                          <SelectItem value="Other" className="text-gray-900">Other</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -625,13 +881,29 @@ export function AdminDashboard({ onViewCase }: AdminDashboardProps) {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                       <div>
                         <h4 className="font-semibold text-blue-900 mb-1">Admin Actions</h4>
-                        <p className="text-sm text-blue-700">Bulk actions and case management tools</p>
+                        <p className="text-sm text-blue-700">
+                          {selectedCases.length > 0 
+                            ? `${selectedCases.length} case(s) selected`
+                            : 'Select cases to perform bulk actions'
+                          }
+                        </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <CustomButton 
                           variant="outline" 
                           size="sm"
-                          className="bg-white border-blue-300 text-blue-700 hover:bg-blue-50"
+                          onClick={() => setSelectedCases(filteredCases.filter(c => c.status === 'Pending Verification').map(c => c._id))}
+                          className="bg-white border-blue-300 text-blue-700 hover:bg-blue-50 hover:text-blue-800"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Select Pending
+                        </CustomButton>
+                        <CustomButton 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleBulkUpdateStatus('Verified')}
+                          disabled={selectedCases.length === 0}
+                          className="bg-white border-green-300 text-green-700 hover:bg-green-50 hover:text-green-800 disabled:opacity-50"
                         >
                           <CheckCircle className="w-4 h-4 mr-2" />
                           Bulk Verify
@@ -639,18 +911,53 @@ export function AdminDashboard({ onViewCase }: AdminDashboardProps) {
                         <CustomButton 
                           variant="outline" 
                           size="sm"
-                          className="bg-white border-green-300 text-green-700 hover:bg-green-50"
+                          onClick={() => handleBulkUpdateStatus('Rejected')}
+                          disabled={selectedCases.length === 0}
+                          className="bg-white border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 disabled:opacity-50"
                         >
-                          <Users className="w-4 h-4 mr-2" />
-                          Assign Panel
+                          <XCircle className="w-4 h-4 mr-2" />
+                          Bulk Reject
                         </CustomButton>
                         <CustomButton 
                           variant="outline" 
                           size="sm"
-                          className="bg-white border-purple-300 text-purple-700 hover:bg-purple-50"
+                          onClick={() => {
+                            if (selectedCases.length === 1) {
+                              const selectedCase = cases.find(c => c._id === selectedCases[0]);
+                              const existingPanel = selectedCase?.assignedPanel;
+                              let members: Array<{
+                                name: string;
+                                role: 'Lawyer' | 'Religious Leader' | 'Community Representative';
+                                email: string;
+                                phone: string;
+                              }> = [
+                                { name: '', role: 'Lawyer', email: '', phone: '' },
+                                { name: '', role: 'Religious Leader', email: '', phone: '' },
+                                { name: '', role: 'Community Representative', email: '', phone: '' }
+                              ];
+                              
+                              if (existingPanel && existingPanel.members && existingPanel.members.length > 0) {
+                                // Autofill with existing panel data
+                                members = existingPanel.members.map(member => ({
+                                  name: member.name || '',
+                                  role: member.role as 'Lawyer' | 'Religious Leader' | 'Community Representative',
+                                  email: member.email || '',
+                                  phone: member.phone || ''
+                                }));
+                              }
+                              
+                              setPanelData({
+                                caseId: selectedCases[0],
+                                members: members
+                              });
+                              setShowPanelModal(true);
+                            }
+                          }}
+                          disabled={selectedCases.length !== 1}
+                          className="bg-white border-purple-300 text-purple-700 hover:bg-purple-50 hover:text-purple-800 disabled:opacity-50"
                         >
-                          <BarChart3 className="w-4 h-4 mr-2" />
-                          Export Data
+                          <Users className="w-4 h-4 mr-2" />
+                          {selectedCases.length === 1 && cases.find(c => c._id === selectedCases[0])?.assignedPanel ? 'Edit Panel' : 'Assign Panel'}
                         </CustomButton>
                       </div>
                     </div>
@@ -666,112 +973,132 @@ export function AdminDashboard({ onViewCase }: AdminDashboardProps) {
                         </p>
                       </div>
                     ) : (
-                      filteredCases.map(case_ => (
-                        <div key={case_._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow bg-white">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center space-x-3">
-                              <CustomBadge variant="outline" className="border-gray-300 text-gray-700 bg-white">{case_.caseType}</CustomBadge>
-                              {getStatusBadge(case_.status)}
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <CustomButton 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => onViewCase(case_._id)}
-                                className="border-gray-300 text-gray-700 hover:bg-gray-50 bg-white"
-                              >
-                                <Eye className="w-4 h-4 mr-2" />
-                                View Details
-                              </CustomButton>
-                              <CustomButton 
-                                variant="outline" 
-                                size="sm"
-                                className="border-blue-300 text-blue-700 hover:bg-blue-50 bg-white"
-                              >
-                                <Settings className="w-4 h-4 mr-2" />
-                                Manage
-                              </CustomButton>
-                            </div>
-                          </div>
-                          
-                          <h4 className="font-semibold text-lg mb-2 text-gray-900">{case_.title}</h4>
-                          <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-                            {case_.description}
-                          </p>
-                          
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-500 mb-3">
-                            <div>
-                              <span className="font-medium text-gray-700">ID:</span> {case_._id}
-                            </div>
-                            <div>
-                              <span className="font-medium text-gray-700">Opposite Party:</span> {case_.oppositePartyName}
-                            </div>
-                            <div>
-                              <span className="font-medium text-gray-700">Created:</span> {formatDate(case_.createdAt)}
-                            </div>
-                            <div>
-                              <span className="font-medium text-gray-700">Updated:</span> {formatDate(case_.updatedAt)}
-                            </div>
-                          </div>
+                      <div className="space-y-4">
+                        {/* Select All Checkbox */}
+                        <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
+                          <input
+                            type="checkbox"
+                            checked={selectedCases.length === filteredCases.length && filteredCases.length > 0}
+                            onChange={handleSelectAllCases}
+                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-gray-700">
+                            Select all ({filteredCases.length} cases)
+                          </span>
+                        </div>
 
-                          {/* Admin Status Control */}
-                          <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                            <div className="flex items-center justify-between">
+                        {filteredCases.map(case_ => (
+                          <div key={case_._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow bg-white">
+                            <div className="flex items-start justify-between mb-3">
                               <div className="flex items-center space-x-3">
-                                <span className="text-sm font-medium text-gray-700">Status:</span>
-                                <Select defaultValue={case_.status}>
-                                  <SelectTrigger className="w-40 bg-white border-gray-300">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="Pending Verification">Pending Verification</SelectItem>
-                                    <SelectItem value="Verified">Verified</SelectItem>
-                                    <SelectItem value="Awaiting Response">Awaiting Response</SelectItem>
-                                    <SelectItem value="Accepted">Accepted</SelectItem>
-                                    <SelectItem value="Rejected">Rejected</SelectItem>
-                                    <SelectItem value="Panel Created">Panel Created</SelectItem>
-                                    <SelectItem value="Mediation in Progress">Mediation in Progress</SelectItem>
-                                    <SelectItem value="Resolved">Resolved</SelectItem>
-                                    <SelectItem value="Unresolved">Unresolved</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <CustomButton 
-                                  size="sm"
-                                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                                >
-                                  Update Status
-                                </CustomButton>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCases.includes(case_._id)}
+                                  onChange={() => handleCaseSelection(case_._id)}
+                                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                <CustomBadge variant="outline" className="border-gray-300 text-gray-700 bg-white">{case_.caseType}</CustomBadge>
+                                {getStatusBadge(case_.status)}
                               </div>
                               <div className="flex items-center space-x-2">
                                 <CustomButton 
                                   variant="outline" 
                                   size="sm"
-                                  className="border-green-300 text-green-700 hover:bg-green-50 bg-white"
+                                  onClick={() => onViewCase(case_._id)}
+                                  className="border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900 bg-white"
                                 >
-                                  <CheckCircle className="w-3 h-3 mr-1" />
-                                  Approve
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  View Details
                                 </CustomButton>
                                 <CustomButton 
                                   variant="outline" 
                                   size="sm"
-                                  className="border-red-300 text-red-700 hover:bg-red-50 bg-white"
+                                  onClick={() => {
+                                    setStatusUpdateData({
+                                      caseId: case_._id,
+                                      status: case_.status,
+                                      resolutionDetails: case_.resolutionDetails
+                                    });
+                                    setShowStatusModal(true);
+                                  }}
+                                  className="border-blue-300 text-blue-700 hover:bg-blue-50 hover:text-blue-800 bg-white"
                                 >
-                                  <XCircle className="w-3 h-3 mr-1" />
-                                  Reject
+                                  <Settings className="w-4 h-4 mr-2" />
+                                  Update Status
+                                </CustomButton>
+                                <CustomButton 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => {
+                                    // Check if case already has an assigned panel
+                                    const existingPanel = case_.assignedPanel;
+                                    let members: Array<{
+                                      name: string;
+                                      role: 'Lawyer' | 'Religious Leader' | 'Community Representative';
+                                      email: string;
+                                      phone: string;
+                                    }> = [
+                                      { name: '', role: 'Lawyer', email: '', phone: '' },
+                                      { name: '', role: 'Religious Leader', email: '', phone: '' },
+                                      { name: '', role: 'Community Representative', email: '', phone: '' }
+                                    ];
+                                    
+                                    if (existingPanel && existingPanel.members && existingPanel.members.length > 0) {
+                                      // Autofill with existing panel data
+                                      members = existingPanel.members.map(member => ({
+                                        name: member.name || '',
+                                        role: member.role as 'Lawyer' | 'Religious Leader' | 'Community Representative',
+                                        email: member.email || '',
+                                        phone: member.phone || ''
+                                      }));
+                                    }
+                                    
+                                    setPanelData({
+                                      caseId: case_._id,
+                                      members: members
+                                    });
+                                    setShowPanelModal(true);
+                                  }}
+                                  className="border-purple-300 text-purple-700 hover:bg-purple-50 hover:text-purple-800 bg-white cursor-pointer"
+                                >
+                                  <Users className="w-4 h-4 mr-2" />
+                                  {case_.assignedPanel ? 'Edit Panel' : 'Assign Panel'}
                                 </CustomButton>
                               </div>
                             </div>
-                          </div>
-
-                          {case_.isPendingInCourt && (
-                            <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs">
-                              <span className="font-medium text-amber-700">Court Proceeding:</span>
-                              {case_.firNumber && ` FIR ${case_.firNumber}`}
-                              {case_.courtName && ` • ${case_.courtName}`}
+                            
+                            <h4 className="font-semibold text-lg mb-2 text-gray-900">{case_.title}</h4>
+                            <p className="text-gray-600 text-sm mb-3 line-clamp-2">
+                              {case_.description}
+                            </p>
+                            
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-500 mb-3">
+                              <div>
+                                <span className="font-medium text-gray-700">ID:</span> {case_._id}
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-700">Opposite Party:</span> {case_.oppositePartyName}
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-700">Created:</span> {formatDate(case_.createdAt)}
+                              </div>
+                              <div>
+                                <span className="font-medium text-gray-700">Updated:</span> {formatDate(case_.updatedAt)}
+                              </div>
                             </div>
-                          )}
-                        </div>
-                      ))
+
+
+
+                            {case_.isPendingInCourt && (
+                              <div className="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs">
+                                <span className="font-medium text-amber-700">Court Proceeding:</span>
+                                {case_.firNumber && ` FIR ${case_.firNumber}`}
+                                {case_.courtName && ` • ${case_.courtName}`}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </CustomCardContent>
@@ -871,6 +1198,248 @@ export function AdminDashboard({ onViewCase }: AdminDashboardProps) {
           )}
         </main>
       </div>
+
+      {/* Status Update Modal */}
+      {showStatusModal && statusUpdateData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900">Update Case Status</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  New Status
+                </label>
+                <Select 
+                  value={statusUpdateData.status} 
+                  onValueChange={(value: Case['status']) => setStatusUpdateData(prev => prev ? {...prev, status: value} : null)}
+                >
+                  <SelectTrigger className="bg-white border-gray-300 text-gray-900">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white border-gray-200">
+                    <SelectItem value="Pending Verification" className="text-gray-900">Pending Verification</SelectItem>
+                    <SelectItem value="Verified" className="text-gray-900">Verified</SelectItem>
+                    <SelectItem value="Awaiting Response" className="text-gray-900">Awaiting Response</SelectItem>
+                    <SelectItem value="Accepted" className="text-gray-900">Accepted</SelectItem>
+                    <SelectItem value="Rejected" className="text-gray-900">Rejected</SelectItem>
+                    <SelectItem value="Panel Created" className="text-gray-900">Panel Created</SelectItem>
+                    <SelectItem value="Mediation in Progress" className="text-gray-900">Mediation in Progress</SelectItem>
+                    <SelectItem value="Resolved" className="text-gray-900">Resolved</SelectItem>
+                    <SelectItem value="Unresolved" className="text-gray-900">Unresolved</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Resolution Details (Optional)
+                </label>
+                <textarea
+                  value={statusUpdateData.resolutionDetails || ''}
+                  onChange={(e) => setStatusUpdateData(prev => prev ? {...prev, resolutionDetails: e.target.value} : null)}
+                  className="w-full p-3 border border-gray-300 rounded-md bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={3}
+                  placeholder="Enter resolution details..."
+                />
+              </div>
+              <div className="flex space-x-3">
+                <CustomButton
+                  onClick={() => handleUpdateCaseStatus(statusUpdateData.caseId, statusUpdateData.status, statusUpdateData.resolutionDetails)}
+                  disabled={isUpdatingStatus}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {isUpdatingStatus ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4 mr-2" />
+                  )}
+                  Update Status
+                </CustomButton>
+                <CustomButton
+                  variant="outline"
+                  onClick={() => {
+                    setShowStatusModal(false);
+                    setStatusUpdateData(null);
+                  }}
+                  className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </CustomButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Panel Assignment Modal */}
+      {showPanelModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {panelData.caseId && cases.find(c => c._id === panelData.caseId)?.assignedPanel ? 'Edit Mediation Panel' : 'Assign Mediation Panel'}
+              </h3>
+              <CustomButton
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowPanelModal(false);
+                  setPanelData({
+                    caseId: '',
+                    members: [
+                      { name: '', role: 'Lawyer', email: '', phone: '' },
+                      { name: '', role: 'Religious Leader', email: '', phone: '' },
+                      { name: '', role: 'Community Representative', email: '', phone: '' }
+                    ]
+                  });
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </CustomButton>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Panel must include at least one Lawyer, one Religious Leader, and one Community Representative. 
+              At least one field (name, email, or phone) must be filled for each member.
+            </p>
+            
+            <div className="space-y-4">
+              {[1, 2, 3].map((index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <h4 className="font-medium mb-3 text-gray-900">Panel Member {index}</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                      <Input
+                        placeholder="Enter name"
+                        value={panelData.members[index - 1]?.name || ''}
+                        onChange={(e) => {
+                          const newMembers = [...panelData.members];
+                          newMembers[index - 1] = { ...newMembers[index - 1], name: e.target.value };
+                          setPanelData(prev => ({ ...prev, members: newMembers }));
+                        }}
+                        className="bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                      <Select
+                        value={panelData.members[index - 1]?.role || ''}
+                        onValueChange={(value: 'Lawyer' | 'Religious Leader' | 'Community Representative') => {
+                          const newMembers = [...panelData.members];
+                          newMembers[index - 1] = { ...newMembers[index - 1], role: value };
+                          setPanelData(prev => ({ ...prev, members: newMembers }));
+                        }}
+                      >
+                        <SelectTrigger className="bg-white border-gray-300 text-gray-900">
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border-gray-200">
+                          <SelectItem value="Lawyer" className="text-gray-900">Lawyer</SelectItem>
+                          <SelectItem value="Religious Leader" className="text-gray-900">Religious Leader</SelectItem>
+                          <SelectItem value="Community Representative" className="text-gray-900">Community Representative</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <Input
+                        type="email"
+                        placeholder="Enter email"
+                        value={panelData.members[index - 1]?.email || ''}
+                        onChange={(e) => {
+                          const newMembers = [...panelData.members];
+                          newMembers[index - 1] = { ...newMembers[index - 1], email: e.target.value };
+                          setPanelData(prev => ({ ...prev, members: newMembers }));
+                        }}
+                        className="bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                      <Input
+                        placeholder="Enter phone"
+                        value={panelData.members[index - 1]?.phone || ''}
+                        onChange={(e) => {
+                          const newMembers = [...panelData.members];
+                          newMembers[index - 1] = { ...newMembers[index - 1], phone: e.target.value };
+                          setPanelData(prev => ({ ...prev, members: newMembers }));
+                        }}
+                        className="bg-white border-gray-300 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              <div className="flex space-x-3">
+                <CustomButton
+                  onClick={() => {
+                    const caseId = panelData.caseId || (selectedCases.length === 1 ? selectedCases[0] : '');
+                    if (caseId) {
+                      console.log('Assigning panel for case:', caseId);
+                      console.log('Panel members:', panelData.members);
+                      
+                      // Filter out empty members and validate data
+                      const validMembers = panelData.members.filter(member => {
+                        const hasName = member.name && member.name.trim().length > 0;
+                        const hasEmail = member.email && member.email.trim().length > 0;
+                        const hasPhone = member.phone && member.phone.trim().length > 0;
+                        return hasName || hasEmail || hasPhone;
+                      }).map(member => ({
+                        name: member.name.trim() || '',
+                        role: member.role,
+                        email: member.email.trim() || '',
+                        phone: member.phone.trim() || ''
+                      }));
+                      
+                      console.log('Valid members:', validMembers);
+                      
+                      if (validMembers.length !== 3) {
+                        toast({
+                          title: "Validation Error",
+                          description: "Please fill in at least one field (name, email, or phone) for all 3 panel members",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      
+                      handleAssignPanel(caseId, validMembers);
+                    } else {
+                      toast({
+                        title: "Error",
+                        description: "No case selected for panel assignment",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  disabled={!panelData.caseId && selectedCases.length !== 1}
+                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white hover:text-white"
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Assign Panel
+                </CustomButton>
+                <CustomButton
+                  variant="outline"
+                  onClick={() => {
+                    setShowPanelModal(false);
+                    setPanelData({
+                      caseId: '',
+                      members: [
+                        { name: '', role: 'Lawyer', email: '', phone: '' },
+                        { name: '', role: 'Religious Leader', email: '', phone: '' },
+                        { name: '', role: 'Community Representative', email: '', phone: '' }
+                      ]
+                    });
+                  }}
+                  className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900"
+                >
+                  Cancel
+                </CustomButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sidebar Overlay for Mobile */}
       {sidebarOpen && (
