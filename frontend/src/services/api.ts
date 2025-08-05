@@ -273,9 +273,41 @@ export const authApi = {
     });
   },
 
+  // Change password
+  changePassword: async (passwordData: { currentPassword: string; newPassword: string }): Promise<ApiResponse<{ user: User }>> => {
+    return await apiRequest<{ user: User }>('/auth/change-password', {
+      method: 'PUT',
+      body: JSON.stringify(passwordData),
+    });
+  },
+
+  // Forgot password
+  forgotPassword: async (data: { email: string }): Promise<ApiResponse<{ message: string }>> => {
+    return await apiRequest<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Reset password
+  resetPassword: async (data: { token: string; password: string }): Promise<ApiResponse<{ message: string }>> => {
+    return await apiRequest<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
   // Logout
-  logout: (): void => {
-    removeAuthToken();
+  logout: async (): Promise<ApiResponse<{ message: string }>> => {
+    const response = await apiRequest<{ message: string }>('/auth/logout', {
+      method: 'POST',
+    });
+    
+    if (response.success) {
+      removeAuthToken();
+    }
+    
+    return response;
   },
 
   // Check if user is authenticated
@@ -420,6 +452,21 @@ export const adminApi = {
 
     const endpoint = `/admin/users${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     return await apiRequest<{ users: User[]; pagination: any }>(endpoint);
+  },
+
+  // Update user role
+  updateUserRole: async (userId: string, role: 'user' | 'admin'): Promise<ApiResponse<{ user: User }>> => {
+    return await apiRequest<{ user: User }>(`/admin/users/${userId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    });
+  },
+
+  // Delete user
+  deleteUser: async (userId: string): Promise<ApiResponse<{ message: string }>> => {
+    return await apiRequest<{ message: string }>(`/admin/users/${userId}`, {
+      method: 'DELETE',
+    });
   },
 
   // Update case status

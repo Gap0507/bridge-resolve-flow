@@ -45,7 +45,8 @@ import {
   Clock3,
   Save,
   UserPlus,
-  Gavel
+  Gavel,
+  User
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -171,9 +172,10 @@ const CustomButton = ({ children, className, variant = 'default', size = 'defaul
 
 interface AdminDashboardProps {
   onViewCase: (caseId: string) => void;
+  onViewProfile?: () => void;
 }
 
-export function AdminDashboard({ onViewCase }: AdminDashboardProps) {
+export function AdminDashboard({ onViewCase, onViewProfile = () => {} }: AdminDashboardProps) {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const [cases, setCases] = useState<Case[]>([]);
@@ -619,6 +621,15 @@ export function AdminDashboard({ onViewCase }: AdminDashboardProps) {
             <div className="flex items-center space-x-3">
               <CustomButton variant="ghost" size="sm">
                 <Bell className="w-5 h-5" />
+              </CustomButton>
+              <CustomButton 
+                variant="ghost" 
+                size="sm"
+                onClick={onViewProfile}
+                className="flex items-center space-x-2"
+              >
+                <User className="w-5 h-5" />
+                <span className="hidden sm:inline">Profile</span>
               </CustomButton>
               <CustomButton variant="ghost" size="sm">
                 <Settings className="w-5 h-5" />

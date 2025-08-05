@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
-import { casesApi, authApi, type Case, type User } from '@/services/api';
+import { casesApi, authApi, type Case, type User as UserType } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Plus, 
@@ -50,7 +50,8 @@ import {
   UserPlus,
   UserMinus,
   Download,
-  Info
+  Info,
+  User as UserIcon
 } from 'lucide-react';
 
 // Types
@@ -58,6 +59,7 @@ interface UserDashboardProps {
   onCreateCase: () => void;
   onViewCase: (caseId: string) => void;
   onEditCase?: (caseId: string) => void;
+  onViewProfile?: () => void;
 }
 
 const statusConfig = {
@@ -192,7 +194,7 @@ const AvatarFallback = ({ children, className }: any) => (
   </div>
 );
 
-export function UserDashboard({ onCreateCase = () => {}, onViewCase = () => {}, onEditCase = () => {} }: UserDashboardProps) {
+export function UserDashboard({ onCreateCase = () => {}, onViewCase = () => {}, onEditCase = () => {}, onViewProfile = () => {} }: UserDashboardProps) {
   const { user, logout } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -518,6 +520,15 @@ export function UserDashboard({ onCreateCase = () => {}, onViewCase = () => {}, 
             <div className="flex items-center space-x-3">
               <Button variant="ghost" size="sm">
                 <Bell className="w-5 h-5" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={onViewProfile}
+                className="flex items-center space-x-2"
+              >
+                <UserIcon className="w-5 h-5" />
+                <span className="hidden sm:inline">Profile</span>
               </Button>
               <Button variant="ghost" size="sm">
                 <Settings className="w-5 h-5" />

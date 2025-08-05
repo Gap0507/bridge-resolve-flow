@@ -6,8 +6,10 @@ import { AdminDashboard } from '@/components/Admin/AdminDashboard';
 import { CreateCaseForm } from '@/components/Case/CreateCaseForm';
 import { CaseDetails } from '@/components/Case/CaseDetails';
 import { EditCaseForm } from '@/components/Case/EditCaseForm';
+import { UserProfile } from '@/components/Profile/UserProfile';
+import { AdminProfile } from '@/components/Profile/AdminProfile';
 
-type AppView = 'login' | 'dashboard' | 'create-case' | 'case-details' | 'edit-case';
+type AppView = 'login' | 'dashboard' | 'create-case' | 'case-details' | 'edit-case' | 'profile' | 'admin-profile';
 
 function AppContent() {
   const { user, isLoading } = useAuth();
@@ -54,6 +56,22 @@ function AppContent() {
     setCurrentView('dashboard');
   };
 
+  const handleViewProfile = () => {
+    setCurrentView('profile');
+  };
+
+  const handleBackFromProfile = () => {
+    setCurrentView('dashboard');
+  };
+
+  const handleViewAdminProfile = () => {
+    setCurrentView('admin-profile');
+  };
+
+  const handleBackFromAdminProfile = () => {
+    setCurrentView('dashboard');
+  };
+
   switch (currentView) {
     case 'create-case':
       return (
@@ -80,15 +98,33 @@ function AppContent() {
         />
       ) : null;
     
+    case 'profile':
+      return (
+        <UserProfile 
+          onBack={handleBackFromProfile}
+        />
+      );
+    
+    case 'admin-profile':
+      return (
+        <AdminProfile 
+          onBack={handleBackFromAdminProfile}
+        />
+      );
+    
     case 'dashboard':
     default:
       return user.role === 'admin' ? (
-        <AdminDashboard onViewCase={handleViewCase} />
+        <AdminDashboard 
+          onViewCase={handleViewCase}
+          onViewProfile={handleViewAdminProfile}
+        />
       ) : (
         <UserDashboard 
           onCreateCase={handleCreateCase}
           onViewCase={handleViewCase}
           onEditCase={handleEditCase}
+          onViewProfile={handleViewProfile}
         />
       );
   }
