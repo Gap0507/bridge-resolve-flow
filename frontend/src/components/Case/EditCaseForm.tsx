@@ -240,7 +240,7 @@ export function EditCaseForm({ caseId, onBack, onSubmit }: EditCaseFormProps) {
 
   const addWitness = () => {
     const newWitness: FormWitness = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: `new-witness-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       name: '',
       email: '',
       phone: '',
@@ -281,13 +281,22 @@ export function EditCaseForm({ caseId, onBack, onSubmit }: EditCaseFormProps) {
       const updateData = {
         ...formData,
         caseType: formData.caseType as 'Family' | 'Business' | 'Criminal' | 'Property' | 'Employment' | 'Other',
-        witnesses: witnesses.map(witness => ({
-          _id: witness.id,
-          name: witness.name,
-          email: witness.email,
-          phone: witness.phone,
-          relationship: witness.relationship
-        }))
+        witnesses: witnesses.map(witness => {
+          // Only include _id if it's a valid MongoDB ObjectId (24 character hex string)
+          const witnessData: any = {
+            name: witness.name,
+            email: witness.email,
+            phone: witness.phone,
+            relationship: witness.relationship
+          };
+          
+          // Only add _id if it's a valid ObjectId (24 character hex string)
+          if (witness.id && witness.id.length === 24 && /^[0-9a-fA-F]{24}$/.test(witness.id)) {
+            witnessData._id = witness.id;
+          }
+          
+          return witnessData;
+        })
       };
 
       // Update case
