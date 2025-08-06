@@ -2,7 +2,6 @@ import express from 'express';
 import {
   register,
   login,
-  verifyEmail,
   getProfile,
   updateProfile,
   changePassword,
@@ -22,7 +21,7 @@ const router = express.Router();
 // Public routes
 router.post('/register', sanitizeInput, validateUserRegistration, register);
 router.post('/login', sanitizeInput, validateUserLogin, login);
-router.get('/verify-email', verifyEmail);
+
 router.post('/forgot-password', sanitizeInput, forgotPassword);
 router.post('/reset-password', sanitizeInput, resetPassword);
 

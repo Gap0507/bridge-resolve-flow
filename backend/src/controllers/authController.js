@@ -1,18 +1,9 @@
 import User from '../models/User.js';
 import { generateToken } from '../middleware/auth.js';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
 
-// Configure email transporter
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
-  }
-});
+
+
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -30,11 +21,7 @@ export const register = async (req, res) => {
       });
     }
 
-    // Create verification token
-    const verificationToken = crypto.randomBytes(32).toString('hex');
-
-    // Create user with auto-verification in development
-    const isDevelopment = process.env.NODE_ENV === 'development';
+    // Create user (no email verification required)
     const user = await User.create({
       email,
       password,
@@ -43,40 +30,15 @@ export const register = async (req, res) => {
       gender,
       address,
       phone,
-      verificationToken: isDevelopment ? undefined : verificationToken,
-      isVerified: isDevelopment // Auto-verify in development
+      isVerified: true // All users are verified by default
     });
 
     // Generate JWT token
     const token = generateToken(user._id);
 
-    // Send verification email only in production
-    if (!isDevelopment) {
-      const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
-      
-      try {
-        await transporter.sendMail({
-          from: process.env.SMTP_USER,
-          to: email,
-          subject: 'Verify your ResolveIt account',
-          html: `
-            <h2>Welcome to ResolveIt!</h2>
-            <p>Please click the link below to verify your email address:</p>
-            <a href="${verificationUrl}">Verify Email</a>
-            <p>If you didn't create this account, please ignore this email.</p>
-          `
-        });
-      } catch (emailError) {
-        console.error('Email sending failed:', emailError);
-        // Don't fail registration if email fails
-      }
-    }
-
     res.status(201).json({
       success: true,
-      message: isDevelopment 
-        ? 'User registered successfully. You can now log in.' 
-        : 'User registered successfully. Please check your email to verify your account.',
+      message: 'User registered successfully. You are now logged in.',
       data: {
         user: user.toJSON(),
         token
@@ -109,13 +71,7 @@ export const login = async (req, res) => {
       });
     }
 
-    // Check if user is verified (only in production)
-    if (process.env.NODE_ENV !== 'development' && !user.isVerified) {
-      return res.status(401).json({
-        success: false,
-        message: 'Please verify your email address before logging in'
-      });
-    }
+    // Email verification is disabled - all users can log in
 
     // Check password
     const isPasswordValid = await user.comparePassword(password);
@@ -151,46 +107,7 @@ export const login = async (req, res) => {
   }
 };
 
-// @desc    Verify email
-// @route   GET /api/auth/verify-email
-// @access  Public
-export const verifyEmail = async (req, res) => {
-  try {
-    const { token } = req.query;
-
-    if (!token) {
-      return res.status(400).json({
-        success: false,
-        message: 'Verification token is required'
-      });
-    }
-
-    const user = await User.findOne({ verificationToken: token });
-    
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid verification token'
-      });
-    }
-
-    user.isVerified = true;
-    user.verificationToken = undefined;
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Email verified successfully'
-    });
-  } catch (error) {
-    console.error('Email verification error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Email verification failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-};
+// Email verification removed - no longer needed
 
 // @desc    Get current user profile
 // @route   GET /api/auth/me
@@ -323,31 +240,21 @@ export const forgotPassword = async (req, res) => {
     user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
     await user.save();
 
-    // Send reset email
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    // Email sending disabled - return reset token directly (for development/testing)
+    // In production, you might want to implement a different password reset flow
     
-    await transporter.sendMail({
-      from: process.env.SMTP_USER,
-      to: email,
-      subject: 'Reset your ResolveIt password',
-      html: `
-        <h2>Password Reset Request</h2>
-        <p>You requested a password reset. Click the link below to reset your password:</p>
-        <a href="${resetUrl}">Reset Password</a>
-        <p>This link will expire in 1 hour.</p>
-        <p>If you didn't request this, please ignore this email.</p>
-      `
-    });
-
     res.status(200).json({
       success: true,
-      message: 'Password reset email sent successfully'
+      message: 'Password reset token generated successfully',
+      data: {
+        resetToken: resetToken // Only for development - remove in production
+      }
     });
   } catch (error) {
     console.error('Forgot password error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to send reset email',
+      message: 'Failed to generate reset token',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
