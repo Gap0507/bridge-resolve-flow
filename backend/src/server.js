@@ -14,33 +14,52 @@ import adminRoutes from './routes/admin.js';
 import User from './models/User.js';
 import bcrypt from 'bcryptjs';
 
-// CORS configuration
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  "http://localhost:8080",
-  "http://localhost:3000",
-  "https://bridge-resolve-flow.onrender.com"
-].filter(Boolean);
-
+// Initialize app and server
 const app = express();
 const server = createServer(app);
+
+// CORS setup (apply FIRST)
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:8080";
+
+// Support multiple origins for development and production
+const allowedOrigins = [
+  FRONTEND_URL,
+  "http://localhost:8080",
+  "https://bridge-resolve-flow.onrender.com"
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle preflight requests
+
+// Socket.IO setup
 const io = new Server(server, {
-  cors: {
-    origin: allowedOrigins.length > 0 ? allowedOrigins : [
-      "http://localhost:8080",
-      "http://localhost:3000",
-      "https://bridge-resolve-flow.onrender.com"
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    credentials: true
-  }
+  cors: corsOptions
 });
 
-// Create default admin user on startup
+// Connect DB and setup default admin
+connectDB().then(createDefaultAdmin);
+
+// Create default admin user
 async function createDefaultAdmin() {
   try {
     const hashedPassword = await bcrypt.hash('admin123', 12);
-    
     await User.findOneAndUpdate(
       { email: 'admin@resolveit.com' },
       {
@@ -61,74 +80,43 @@ async function createDefaultAdmin() {
       },
       { upsert: true, new: true }
     );
-    
     console.log('✅ Default admin user ready');
-    console.log('📧 Email: admin@resolveit.com');
-    console.log('🔑 Password: admin123');
   } catch (error) {
     console.error('❌ Error setting up default admin:', error.message);
   }
 }
 
-// Connect to database
-connectDB().then(() => {
-  // Create default admin after database connection
-  createDefaultAdmin();
-});
-
-// Security middleware
+// Security headers
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-}));
-
-// Apply CORS middleware
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
+      imgSrc: ["'self'", "data:", "https:"]
     }
-    
-    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-    return callback(new Error(msg), false);
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with'],
-  exposedHeaders: ['set-cookie']
+  }
 }));
 
 // Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+app.use('/api/', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   message: 'Too many requests from this IP, please try again later.'
-});
-app.use('/api/', limiter);
+}));
 
-// Body parsing middleware
+// Parsers
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Serve static files (uploaded files)
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
-
-// Serve uploaded files with custom middleware
-app.use(serveUploads);
-
-// Compression middleware
+// Compression
 app.use(compression());
 
-// Health check endpoint
+// File upload serving
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use(serveUploads);
+
+// Health check
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
@@ -138,31 +126,31 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// API routes
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/cases', caseRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Socket.IO connection handling
+// Socket.IO Events
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  
+  console.log('🔌 User connected:', socket.id);
+
   socket.on('join-case', (caseId) => {
     socket.join(`case-${caseId}`);
-    console.log(`User ${socket.id} joined case ${caseId}`);
+    console.log(`🧑‍⚖️ ${socket.id} joined case ${caseId}`);
   });
-  
+
   socket.on('leave-case', (caseId) => {
     socket.leave(`case-${caseId}`);
-    console.log(`User ${socket.id} left case ${caseId}`);
+    console.log(`👋 ${socket.id} left case ${caseId}`);
   });
-  
+
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+    console.log('❌ User disconnected:', socket.id);
   });
 });
 
-// Error handling middleware
+// Error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
@@ -180,13 +168,12 @@ app.use('*', (req, res) => {
   });
 });
 
+// Start server
 const PORT = process.env.PORT || 5000;
-
 server.listen(PORT, () => {
-  console.log(`🚀 ResolveIt API server running on port ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📡 API URL: http://localhost:${PORT}/api`);
-  console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:8080'}`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌐 API URL: http://localhost:${PORT}/api`);
+  console.log(`🔗 Frontend URL: ${FRONTEND_URL}`);
 });
 
-export { io }; 
+export { io };
