@@ -14,12 +14,25 @@ import adminRoutes from './routes/admin.js';
 import User from './models/User.js';
 import bcrypt from 'bcryptjs';
 
+// CORS configuration
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  "http://localhost:8080",
+  "http://localhost:3000",
+  "https://bridge-resolve-flow.onrender.com"
+].filter(Boolean);
+
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:8080",
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+    origin: allowedOrigins.length > 0 ? allowedOrigins : [
+      "http://localhost:8080",
+      "http://localhost:3000",
+      "https://bridge-resolve-flow.onrender.com"
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    credentials: true
   }
 });
 
@@ -75,10 +88,23 @@ app.use(helmet({
   },
 }));
 
-// CORS configuration
+// Apply CORS middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:8080",
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+    return callback(new Error(msg), false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-requested-with'],
+  exposedHeaders: ['set-cookie']
 }));
 
 // Rate limiting
